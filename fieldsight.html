@@ -10,14 +10,14 @@
    暖纸白底 / 衬线标题 / 墨绿·赭红·麦黄点缀 / 细线分隔
    ============================================================ */
 :root {
-  --paper:#0b1115; --panel:#111a20; --panel2:#18242b;
-  --ink:#edf3f2; --ink2:#b3c0c3; --ink3:#74868b;
-  --line:#2a3a41; --line2:#3a4f57;
-  --brand:#d4b26a; --brand-soft:#2a281f; --focus:#62c3bc;
-  --green:#61c58c; --green-bg:#16392e;
-  --red:#ef806d; --red-bg:#3a201f;
-  --amber:#e1b85b; --amber-bg:#3a301c;
-  --blue:#6bb6e8; --blue-bg:#173242;
+  --paper:#f7f8f5; --panel:#ffffff; --panel2:#f0f4f1;
+  --media:#f4f6f5; --ink:#18231f; --ink2:#53615b; --ink3:#748079;
+  --line:#d5ddd8; --line2:#aebbb4;
+  --brand:#1f5a47; --brand-soft:#e9f1ec; --focus:#147c73;
+  --green:#237a4d; --green-bg:#e8f4ec;
+  --red:#a94436; --red-bg:#f9ebe8;
+  --amber:#966b12; --amber-bg:#fbf3df;
+  --blue:#21658c; --blue-bg:#e8f1f6;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -36,7 +36,7 @@ a:hover { text-decoration:underline; }
 .masthead { padding:20px 0 12px; }
 .brandbar { display:flex; align-items:center; justify-content:space-between; gap:20px; border-bottom:1px solid var(--line); padding:0 0 12px; }
 .brand-lockup { display:flex; align-items:center; gap:11px; min-width:0; }
-.brand-lockup img { display:block; width:34px; height:30px; object-fit:contain; filter:drop-shadow(0 0 10px rgba(212,178,106,.16)); }
+.brand-lockup img { display:block; width:34px; height:30px; object-fit:contain; filter:none; }
 .brand-name { font-size:0.86rem; font-weight:700; letter-spacing:0.06em; color:var(--ink); white-space:nowrap; }
 .brand-en { margin-top:2px; font-size:0.65rem; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink3); white-space:nowrap; }
 .research-label { color:var(--brand); font-size:0.7rem; font-weight:700; letter-spacing:0.11em; text-transform:uppercase; white-space:nowrap; }
@@ -50,7 +50,7 @@ a:hover { text-decoration:underline; }
 /* ---------- 状态行 ---------- */
 .statusline { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:var(--panel); font-size:0.76rem; color:var(--ink2); font-family:'SF Mono',Menlo,Consolas,monospace; }
 .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; }
-.dot.ok{background:var(--green); box-shadow:0 0 8px rgba(97,197,140,.55);} .dot.err{background:var(--red);}
+.dot.ok{background:var(--green);} .dot.err{background:var(--red);}
 .dot.load{background:var(--amber); animation:blink 1s infinite;}
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
 .statusline button { background:transparent; color:var(--blue); border:1px solid var(--line2); border-radius:4px; padding:3px 10px; cursor:pointer; font-size:0.72rem; font-family:inherit; }
@@ -151,7 +151,7 @@ details.ig[open] summary { border-bottom:1px solid var(--line); }
 .crop-tab.active { background:var(--panel2); border-color:var(--focus); box-shadow:inset 2px 0 0 var(--brand); }
 .crop-tab.active .nm { color:var(--ink); }
 .crop-tab.active .ct { color:var(--focus); }
-.crop-panel { display:none; border:1px solid var(--line); border-radius:7px; background:rgba(17,26,32,.72); padding:4px 16px 18px; }
+.crop-panel { display:none; border:1px solid var(--line); border-radius:7px; background:var(--panel2); padding:4px 16px 18px; }
 .crop-panel.active { display:block; }
 .prov { display:flex; align-items:center; gap:10px; margin:17px 0 11px; color:var(--ink2); font-size:0.78rem; letter-spacing:0.04em; }
 .prov::before,.prov::after { content:''; flex:1; border-top:1px solid var(--line); }
@@ -287,40 +287,40 @@ footer { margin-top:54px; border-top:2px solid var(--ink); padding:17px 0 0; tex
 .footer-brand { display:flex; align-items:center; gap:8px; margin-bottom:5px; color:var(--ink); font-weight:700; letter-spacing:0.07em; }
 .footer-brand img { width:21px; height:18px; object-fit:contain; }
 
-/* ---------- 终端表面统一 ---------- */
-.alert-list li, .ocean, details.ig, .event-card, .src-card, .news-list, .table-wrap, .waw-mini { background:var(--panel); border-color:var(--line); border-radius:6px; }
-.alert-list li { padding:13px 16px 13px 48px; }
+/* ---------- 白色研究表面统一 ---------- */
+.alert-list li, .ocean, details.ig, .event-card, .src-card, .news-list, .table-wrap, .waw-mini { background:var(--panel); border-color:var(--line); border-radius:5px; }
+.alert-list li { padding:13px 16px 13px 48px; box-shadow:0 1px 2px rgba(24,35,31,.025); }
 .alert-list .aol { background:var(--panel2); color:var(--ink2); border:1px solid var(--line); border-radius:3px; }
-.alert-list .aol.out { color:var(--blue); border-color:rgba(107,182,232,.5); }
-.alert-list .aol.imp { color:var(--amber); border-color:rgba(225,184,91,.5); background:var(--amber-bg); }
-.ocean { border-top-color:var(--focus); }
+.alert-list .aol.out { color:var(--blue); border-color:#b7d1df; background:var(--blue-bg); }
+.alert-list .aol.imp { color:var(--amber); border-color:#e4c98e; background:var(--amber-bg); }
+.ocean { border-top-color:var(--brand); box-shadow:0 1px 2px rgba(24,35,31,.025); }
 details.ig summary { color:var(--ink); }
 details.ig summary:hover { background:var(--panel2); }
 details.ig summary .mk { font-size:0; width:9px; height:9px; border-right:1px solid currentColor; border-bottom:1px solid currentColor; transform:rotate(45deg) translateY(-3px); }
 details.ig summary .mk::after, details.ig[open] summary .mk::after { content:none; }
 details.ig[open] summary .mk { transform:rotate(225deg) translate(-2px,2px); }
-.img-cell, .src-card, .typhoon-map, .anim-panel, .ty-frame, .chart-box { background:var(--panel2); border-color:var(--line); }
+.img-cell, .src-card, .typhoon-map, .anim-panel, .ty-frame, .chart-box { background:var(--media); border-color:var(--line); }
 .img-cell { border-radius:4px; }
 .img-cell img, .img-cell iframe, .typhoon-map img, .anim-stage .anim-img, .waw-img { border-color:var(--line2); }
 .src-card { color:var(--ink); border-top-color:var(--line2); }
-.src-card:hover { border-top-color:var(--focus); }
+.src-card:hover { border-top-color:var(--brand); }
 .src-card h5 { color:var(--ink); }
-.anim-btn, .ty-tab.active { background:var(--focus); color:#071214; border-color:var(--focus); }
+.anim-btn, .ty-tab.active { background:var(--brand); color:#fff; border-color:var(--brand); }
 .ty-tab { background:var(--panel); border-color:var(--line); color:var(--ink2); border-radius:4px; }
-.ty-tab:hover { border-color:var(--focus); color:var(--ink); }
-.ty-frame { background:#e8eef0; }
+.ty-tab:hover { border-color:var(--focus); color:var(--brand); }
+.ty-frame { background:#eef2f0; }
 .table-wrap { border-color:var(--line); }
 th { background:var(--panel2); color:var(--ink); border-bottom:1px solid var(--line2); }
-tr:nth-child(even) td { background:rgba(24,36,43,.65); }
-.strat li { background:var(--panel); border-color:var(--line); border-left-color:var(--focus); }
+tr:nth-child(even) td { background:#f7f9f7; }
+.strat li { background:var(--panel); border-color:var(--line); border-left-color:var(--brand); }
 .news-list .t a { color:var(--ink); }
-.news-list .s { color:var(--focus); border-color:rgba(98,195,188,.5); }
+.news-list .s { color:var(--brand); border-color:#a9c9bb; }
 .event-card .emeta { border-bottom-color:var(--line); }
 .event-card h4, .conv-h, .paperbox h3 { color:var(--ink); }
-.overlay { background:rgba(3,7,10,.8); backdrop-filter:blur(5px); }
-.paperbox { background:var(--panel); border-color:var(--line2); box-shadow:0 18px 60px rgba(0,0,0,.45); }
+.overlay { background:rgba(24,35,31,.32); backdrop-filter:blur(3px); }
+.paperbox { background:var(--panel); border-color:var(--line2); box-shadow:0 18px 50px rgba(24,35,31,.18); }
 .paperbox h3 { border-bottom-color:var(--line2); }
-.chart-box { background:#10191e; }
+.chart-box { background:#fff; }
 footer { border-top-color:var(--line2); }
 .footer-brand { color:var(--ink); }
 
@@ -1432,11 +1432,11 @@ async function loadSeasonData(lat, lon) {
 
 function buildSeasonChart(canvas, s, opts) {
   const ds = [
-    { label:'_hi', data:s.hi, borderColor:'rgba(0,0,0,0)', backgroundColor:'rgba(107,182,232,0.16)', pointRadius:0, fill:false, order:5 },
-    { label:`${opts.n}年区间`, data:s.lo, borderColor:'rgba(0,0,0,0)', backgroundColor:'rgba(107,182,232,0.16)', pointRadius:0, fill:'-1', order:5 },
-    { label:`${opts.n}年均值`, data:s.mean10, borderColor:'#8ba0a7', borderDash:[5,4], borderWidth:1.4, pointRadius:0, fill:false, order:3 },
-    { label:'近5年均值', data:s.mean5, borderColor:'#6bb6e8', borderWidth:1.8, pointRadius:0, fill:false, order:2 },
-    { label:`${new Date().getFullYear()}年`, data:s.cur, borderColor:'#d4b26a', borderWidth:2.5, pointRadius:0, fill:false, order:1 },
+    { label:'_hi', data:s.hi, borderColor:'rgba(0,0,0,0)', backgroundColor:'rgba(42,120,214,0.12)', pointRadius:0, fill:false, order:5 },
+    { label:`${opts.n}年区间`, data:s.lo, borderColor:'rgba(0,0,0,0)', backgroundColor:'rgba(42,120,214,0.12)', pointRadius:0, fill:'-1', order:5 },
+    { label:`${opts.n}年均值`, data:s.mean10, borderColor:'#eb6834', borderDash:[5,4], borderWidth:1.4, pointRadius:0, fill:false, order:3 },
+    { label:'近5年均值', data:s.mean5, borderColor:'#2a78d6', borderWidth:1.8, pointRadius:0, fill:false, order:2 },
+    { label:`${new Date().getFullYear()}年`, data:s.cur, borderColor:'#1baf7a', borderWidth:2.5, pointRadius:0, fill:false, order:1 },
   ];
   return new Chart(canvas, {
     type:'line', data:{ labels:MMDD, datasets:ds },
@@ -1444,12 +1444,12 @@ function buildSeasonChart(canvas, s, opts) {
       responsive:true, maintainAspectRatio:false, animation:false, spanGaps:true,
       interaction:{ mode:'index', intersect:false },
       plugins:{
-        legend:{ labels:{ color:'#b3c0c3', boxWidth:18, boxHeight:2, filter:it => it.text !== '_hi' } },
-        tooltip:{ backgroundColor:'#111a20', titleColor:'#edf3f2', bodyColor:'#b3c0c3', borderColor:'#3a4f57', borderWidth:1, callbacks:{ title: items => { const l = items[0].label.split('-'); return `${+l[0]}月${+l[1]}日`; } }, filter: it => it.dataset.label !== '_hi' },
+        legend:{ labels:{ color:'#53615b', boxWidth:18, boxHeight:2, filter:it => it.text !== '_hi' } },
+        tooltip:{ backgroundColor:'#ffffff', titleColor:'#18231f', bodyColor:'#53615b', borderColor:'#d5ddd8', borderWidth:1, callbacks:{ title: items => { const l = items[0].label.split('-'); return `${+l[0]}月${+l[1]}日`; } }, filter: it => it.dataset.label !== '_hi' },
       },
       scales:{
-        x:{ ticks:{ color:'#74868b', maxRotation:0, autoSkip:false, callback:function(v){ const l = this.getLabelForValue(v); return l.endsWith('-01') ? `${+l.slice(0,2)}月` : null; } }, grid:{ color:'rgba(58,79,87,0.55)' } },
-        y:{ title:{ display:true, text:opts.yLabel, color:'#b3c0c3', font:{ size:11 } }, ticks:{ color:'#74868b' }, grid:{ color:'rgba(58,79,87,0.55)' } },
+        x:{ ticks:{ color:'#748079', maxRotation:0, autoSkip:false, callback:function(v){ const l = this.getLabelForValue(v); return l.endsWith('-01') ? `${+l.slice(0,2)}月` : null; } }, grid:{ color:'rgba(213,221,216,0.75)' } },
+        y:{ title:{ display:true, text:opts.yLabel, color:'#53615b', font:{ size:11 } }, ticks:{ color:'#748079' }, grid:{ color:'rgba(213,221,216,0.75)' } },
       },
     },
   });
