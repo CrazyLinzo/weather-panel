@@ -426,7 +426,7 @@ footer { border-top-color:var(--line2); }
 
 <section class="sec" data-key="ocean">
   <div class="sec-head" onclick="toggleSec(this)"><span class="num">贰</span><h2>海洋指数</h2><span class="sub" id="oceanSub">ENSO · PDO · NAO · IOD</span><span class="tog">[−]</span></div>
-  <div class="sec-body"><div class="ocean-grid" id="oceanGrid"></div><div class="conv-note" id="autoFetchStrip" style="display:none;margin-top:12px;"></div></div>
+  <div class="sec-body"><div class="ocean-grid" id="oceanGrid"></div><div class="conv-note" id="autoFetchStrip" style="display:none;margin-top:12px;"></div><div class="conv-note" id="autoHistoryStrip" style="display:none;margin-top:6px;"></div></div>
 </section>
 
 <section class="sec" data-key="cnwx">
@@ -499,6 +499,7 @@ footer { border-top-color:var(--line2); }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="fieldsight-data.js"></script>
 <script src="data/auto-fetch.js"></script>
+<script src="data/history.js"></script>
 <script>
 // ============================================================
 // CONFIG（与 WeatherAI Panel 同参数）
@@ -761,6 +762,7 @@ function renderOceanIndices() {
       <div class="src">观测期 ${o.obsPeriod}｜${o.cadence}｜核对 ${o.checked}<br>来源: ${o.sources.map(s => `<a href="${s.u}" target="_blank" rel="noopener">${s.l}</a>`).join(' · ')}</div>
     </div>`).join('');
   renderAutoFetchStrip();
+  renderAutoHistory();
 }
 // ⚡ 官方数据自动采集状态条 —— 由 GitHub Actions 每日生成 data/auto-fetch.js, 这里只做展示
 function renderAutoFetchStrip() {
@@ -768,14 +770,40 @@ function renderAutoFetchStrip() {
   if (!el || typeof AUTO_FETCH === 'undefined') return;
   const S = AUTO_FETCH.sources || {};
   const parts = [];
-  const nao = S.nao, nino = S.nino34, mr = S.midrange;
+  const nao = S.nao, nino = S.nino34, mr = S.midrange, ty = S.typhoon;
   if (nao && nao.value != null) parts.push(`NOAA CPC NAO 日值 <b>${nao.value}</b>（观测 ${nao.date}）`);
-  if (nino && nino.anom != null) parts.push(`CPC NINO3.4 距平 <b>${nino.anom >= 0 ? '+' : ''}${nino.anom}°C</b>（${nino.month}）`);
+  if (nino && nino.anom != null) parts.push(`CPC NINO3.4 距平 <b>${nino.anom >= 0 ? '+' : ''}${nino.anom}°C</b>（${nino.month}）${nino.phase ? `<span class="tag high">${nino.phase}</span>` : ''}`);
   if (mr && mr.snapshot) parts.push(`中期公报快照 <a href="${mr.snapshot}" target="_blank" rel="noopener">${mr.snapshot.split('/').pop()}</a>`);
+  if (ty && ty.count != null) parts.push(`CMA实时台风 <b>${ty.count}个活动</b>（${(ty.list || []).map(x => x.cn).join('、')}）`);
   el.innerHTML = parts.length
     ? `⚡ <b>官方数据自动采集</b>（GitHub Actions 每日 00:17）· 上次 ${AUTO_FETCH.fetchedAt}　·　${parts.join('　·　')}　<a class="conv-srclink" href="https://github.com/CrazyLinzo/weather-panel/tree/master/data/midrange" target="_blank" rel="noopener">快照存档 ↗</a>`
     : '';
   el.style.display = parts.length ? 'block' : 'none';
+}
+
+// ⚡ 自动数据时间序列迷你趋势 —— 数据来自 data/history.js(GitHub Actions 每日追加), 纯前端 SVG
+function renderAutoHistory() {
+  const el = document.getElementById('autoHistoryStrip');
+  const hasHist = typeof AUTO_HISTORY !== 'undefined' && Array.isArray(AUTO_HISTORY) && AUTO_HISTORY.length >= 3;
+  if (!el || !hasHist) { if (el) el.style.display = 'none'; return; }
+  const H = AUTO_HISTORY.slice(-60);
+  const spark = (arr, color) => {
+    const w = 240, h = 34, pad = 2;
+    const vals = arr.filter(v => v != null);
+    if (!vals.length) return '';
+    const mn = Math.min(...vals), mx = Math.max(...vals), span = (mx - mn) || 1;
+    const pts = arr.map((v, i) => v == null ? null
+      : `${(pad + (i / (arr.length - 1)) * (w - 2 * pad)).toFixed(1)},${(h - pad - ((v - mn) / span) * (h - 2 * pad)).toFixed(1)}`)
+      .filter(Boolean).join(' ');
+    return `<svg width="${w}" height="${h}" style="display:block;background:var(--panel);border:1px solid var(--line);border-radius:3px;"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
+  };
+  const d0 = H[0].d, d1 = H[H.length - 1].d;
+  el.innerHTML = `<b>⚡ 自动数据趋势</b><span style="font-size:.72rem;color:var(--ink2);">（${d0} → ${d1} · 自动采集以来）</span>
+    <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;">
+      <div><div style="font-size:.72rem;color:var(--ink2);margin-bottom:2px;">NINO3.4 距平(°C)</div>${spark(H.map(h => h.nino), '#d97706')}</div>
+      <div><div style="font-size:.72rem;color:var(--ink2);margin-bottom:2px;">NAO</div>${spark(H.map(h => h.nao), '#2563eb')}</div>
+    </div>`;
+  el.style.display = 'block';
 }
 
 // ---------- 中国预报图 (中央气象台官方降水图内嵌·时间戳自动探测 + 官方导航) ----------
@@ -1454,6 +1482,7 @@ function renderTyphoonPanel() {
   const toolbar = t.layers.map(l => `<button type="button" class="ty-tab" data-key="${l.key}" onclick="switchTyphoonLayer('${l.key}')">${l.label}</button>`).join('');
   el.innerHTML = `
     <div class="ty-toolbar">${toolbar}<span class="ty-hint">切换图层 · 空白/被拦截时请点“打开来源”或换图层</span></div>
+    <div id="typhoonLive"></div>
     <div class="typhoon-embed" id="typhoonEmbed"></div>
     <div class="img-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-top:12px;">
       ${t.cards.map(c => `
@@ -1465,7 +1494,45 @@ function renderTyphoonPanel() {
         </a>`).join('')}
     </div>
     <div class="conv-note">${t.note}</div>`;
+  renderTyphoonLive();
   switchTyphoonLayer(t.defaultLayer || (t.layers[0] && t.layers[0].key));
+}
+// ⚡ CMA 实时台风自动卡 —— 数据来自 AUTO_FETCH.sources.typhoon(GitHub Actions 每日采集), 数据缺失自动隐藏
+function renderTyphoonLive() {
+  const box = document.getElementById('typhoonLive');
+  if (!box) return;
+  const S = (typeof AUTO_FETCH !== 'undefined') ? (AUTO_FETCH.sources || {}) : {};
+  const ty = S.typhoon, phase = S.nino34 && S.nino34.phase;
+  if (!ty || !ty.list || !ty.list.length) { box.style.display = 'none'; return; }
+  const EN_NOTE = {
+    '弱厄尔尼诺': 'EN暖相位 · 台风活跃度偏高',
+    '中等厄尔尼诺': 'EN年台风偏强 · 关注华东华南',
+    '强厄尔尼诺': 'EN年台风偏强 · 路径偏东 · 关注华东',
+    '极强厄尔尼诺': '极强EN年 · 台风偏强 · 路径偏东 · 重点盯防华东'
+  };
+  const cards = ty.list.map(x => {
+    const pos = (x.lat != null && x.lon != null) ? `${x.lat.toFixed(1)}°N ${x.lon.toFixed(1)}°E` : '—';
+    const obs = (x.obs || '').replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/, '$1-$2-$3 $4:$5');
+    const fc = x.fc24 ? `<div class="note" style="color:var(--ink2);">24h预报: ${x.fc24.gradeZh}（${x.fc24.lat.toFixed(1)}N, ${x.fc24.lon.toFixed(1)}E · ${x.fc24.wind}m/s）</div>` : '';
+    const err = x.error ? `<div class="note" style="color:var(--red);">⚠ ${x.error}</div>` : '';
+    return `<a class="src-card" style="background:var(--panel);" href="https://typhoon.nmc.cn/" target="_blank" rel="noopener">
+      <div class="sc-ic">🌀</div>
+      <h5>${x.cn} <span class="tag low">${x.no}</span></h5>
+      <div class="sc-kind">${x.gradeZh} · 中心 ${pos}</div>
+      <div class="note">气压 ${x.pressure} hPa · 风速 ${x.wind} m/s<br>观测 ${obs}</div>
+      ${fc}${err}
+    </a>`;
+  }).join('');
+  const enTag = EN_NOTE[phase] ? `<span class="tag severe">${EN_NOTE[phase]}</span>` : '';
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 10px;">
+      <b>⚡ CMA 实时台风（自动采集）</b>
+      <span style="font-size:.72rem;color:var(--ink2);">${ty.year}年 · ${ty.count}个活动 · 每日 00:17 自动更新</span>
+      ${phase ? `<span class="tag high">${phase}</span>` : ''}${enTag}
+    </div>
+    <div class="img-grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr));">${cards}</div>
+    <div class="conv-note" style="margin-top:6px;">定位/强度/BABJ官方预报来自中央气象台台风网接口，每日 00:17 自动采集。以台风网页面为准。</div>`;
+  box.style.display = 'block';
 }
 function switchTyphoonLayer(key) {
   const t = TYPHOON_MONITOR, box = document.getElementById('typhoonEmbed');

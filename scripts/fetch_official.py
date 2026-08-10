@@ -14,17 +14,37 @@
 纯 Python 标准库实现, 无第三方依赖, Linux/Windows 均可运行。
 """
 import urllib.request
+import urllib.error
+import ssl
 import re
 import html as html_mod
 import os
+import json
 from datetime import datetime, timezone, timedelta
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(REPO_ROOT, "data")
 SNAPSHOT_DIR = os.path.join(DATA_DIR, "midrange")
 KEEP_SNAPSHOTS = 30          # 保留最近 N 期公报快照, 超出删除
+HISTORY_PATH = os.path.join(DATA_DIR, "history.js")
+HISTORY_MAX = 90             # 自动数据时间序列保留条数
+TYPHOON_MAX = 6              # 最多抓取的活动台风详情数(防超时)
 BJ = timezone(timedelta(hours=8))
 UA = "Mozilla/5.0 (daily-fetch bot; +https://github.com/CrazyLinzo/weather-panel)"
+
+GRADE_ZH = {"TD": "热带低压", "TS": "热带风暴", "STS": "强热带风暴", "TY": "台风", "STY": "强台风", "SuperTY": "超强台风"}
+
+
+def enso_phase(anom):
+    """按 CPC ONI 阈值对 NINO3.4 距平自动判相位(月度近似)。"""
+    if anom >= 2.0: return "极强厄尔尼诺"
+    if anom >= 1.5: return "强厄尔尼诺"
+    if anom >= 1.0: return "中等厄尔尼诺"
+    if anom >= 0.5: return "弱厄尔尼诺"
+    if anom > -0.5: return "中性"
+    if anom > -1.0: return "弱拉尼娜"
+    if anom > -1.5: return "中等拉尼娜"
+    return "强拉尼娜"
 
 
 def now_bj():
@@ -56,10 +76,12 @@ def parse_cpc_nino34():
     rows = [l.split() for l in d.decode("utf-8", "ignore").splitlines() if l.strip() and l[0].isdigit()]
     last = rows[-1]
     y, m = int(last[0]), int(last[1])
+    anom = round(float(last[9]), 2)
     return {
         "value": round(float(last[8]), 2),   # NINO3.4 温度
-        "anom": round(float(last[9]), 2),    # NINO3.4 距平
+        "anom": anom,                        # NINO3.4 距平
         "month": f"{y}-{m:02d}",
+        "phase": enso_phase(anom),           # 自动判相位(替代人工核对)
     }
 
 
@@ -81,6 +103,52 @@ def parse_nmc_midrange():
     m = re.search(r"(预计|未来10天)", body)
     text = body[m.start():].strip() if m else body.strip()
     return {"text": text, "issued": issued}
+
+
+def parse_cma_typhoon():
+    """中央气象台台风网实时台风: 年度活动列表 + 每个活动台风的最新定位/强度/BABJ官方预报。
+
+    端点: list_{年} → 活动列表; view_{tfId} → 单台风全量路径点与预报。
+    返回 JSONP(typhoon_jsons_xxx(...)), 需剥壳; 证书为自签链, 失败时降级为不校验(只读公开数据)。
+    """
+    def get(url):
+        req = urllib.request.Request(url, headers={"User-Agent": UA, "Referer": "https://typhoon.nmc.cn/"})
+        try:
+            return urllib.request.urlopen(req, timeout=25).read().decode("utf-8", "ignore")
+        except urllib.error.URLError as e:
+            # 台风网证书为自签链, 证书失败时降级为不校验(只读公开数据)
+            if isinstance(e.reason, ssl.SSLCertVerificationError):
+                return urllib.request.urlopen(req, timeout=25, context=ssl._create_unverified_context()).read().decode("utf-8", "ignore")
+            raise
+
+    year = now_bj().year
+    raw = get(f"https://typhoon.nmc.cn/weatherservice/typhoon/jsons/list_{year}")
+    m = re.search(r"\((.*)\)\s*$", raw, re.S)
+    data = json.loads(m.group(1))
+    active = [t for t in data["typhoonList"] if t[7] == "start"]
+    result = {"year": year, "count": len(active), "list": []}
+    for t in active[:TYPHOON_MAX]:
+        tfid, en, cn, no = t[0], t[1], t[2], t[3]
+        item = {"no": no, "en": en, "cn": cn}
+        try:
+            v = get(f"https://typhoon.nmc.cn/weatherservice/typhoon/jsons/view_{tfid}")
+            vm = re.search(r"\((.*)\)\s*$", v, re.S)
+            pts = json.loads(vm.group(1))["typhoon"][8]      # 第9项=路径点数组
+            last = pts[-1]                                   # 末点=最新观测
+            item.update({
+                "obs": last[1], "grade": last[3], "lon": last[4], "lat": last[5],
+                "pressure": last[6], "wind": last[7],
+                "gradeZh": GRADE_ZH.get(last[3], last[3]),
+            })
+            babj = (last[11] or {}).get("BABJ", [])          # 官方集合预报
+            for lead in (24, 48, 72):
+                fc = next((x for x in babj if x[0] == lead), None)
+                if fc:
+                    item[f"fc{lead}"] = {"lon": fc[2], "lat": fc[3], "wind": fc[5], "grade": fc[7], "gradeZh": GRADE_ZH.get(fc[7], fc[7])}
+        except Exception as e:
+            item["error"] = str(e)[:60]
+        result["list"].append(item)
+    return result
 
 
 # ---------- 快照与产物输出 ----------
@@ -144,7 +212,25 @@ def json_dumps(v):
     return json.dumps(v, ensure_ascii=False)
 
 
-import json  # noqa: E402
+def load_history():
+    """读回 data/history.js 中的 AUTO_HISTORY 数组(纯 JSON 载荷)。"""
+    try:
+        with open(HISTORY_PATH, encoding="utf-8") as f:
+            js = f.read().split("=", 1)[1].strip().rstrip(";")
+        return json.loads(js)
+    except Exception:
+        return []
+
+
+def write_history(entries):
+    with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+        f.write(
+            "// ============================================================\n"
+            "// ⚡ 自动数据时间序列 — 由 fetch_official.py 每日追加, 前端画趋势\n"
+            "// ============================================================\n"
+            "const AUTO_HISTORY = " + json.dumps(entries, ensure_ascii=False) + ";\n"
+        )
+    return HISTORY_PATH
 
 
 def main():
@@ -152,11 +238,13 @@ def main():
         "nao": {"label": "NOAA CPC NAO 日值", "url": "ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii"},
         "nino34": {"label": "CPC NINO3.4 周值", "url": "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"},
         "midrange": {"label": "中央气象台《中期天气预报》快照", "url": "http://www.nmc.cn/publish/bulletin/mid-range.htm"},
+        "typhoon": {"label": "中央气象台台风网 实时台风", "url": "https://typhoon.nmc.cn/"},
     }
     parsers = {
         "nao": parse_cpc_nao,
         "nino34": parse_cpc_nino34,
         "midrange": parse_nmc_midrange,
+        "typhoon": parse_cma_typhoon,
     }
     for key in sources:
         try:
@@ -169,7 +257,21 @@ def main():
         except Exception as e:
             sources[key].update({"ok": False, "error": str(e)})
 
+    # 时间序列累积: 成功取到 NAO/NINO3.4 才追加当日值
     fetched_at = now_bj()
+    entries = load_history()
+    today = fetched_at.strftime("%Y-%m-%d")
+    nao_v = sources["nao"].get("value")
+    nino_v = sources["nino34"].get("anom")
+    if nao_v is not None and nino_v is not None:
+        if entries and entries[-1].get("d") == today:
+            entries[-1].update({"nao": nao_v, "nino": nino_v})
+        else:
+            entries.append({"d": today, "nao": nao_v, "nino": nino_v})
+        del entries[:-HISTORY_MAX]
+        hist_path = write_history(entries)
+        print(f"  history: {len(entries)} 条 -> {hist_path}")
+
     out = write_auto_fetch(sources, fetched_at)
     print(f"[{fetched_at:%Y-%m-%d %H:%M}] auto-fetch done -> {out}")
     for key, s in sources.items():
