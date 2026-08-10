@@ -710,7 +710,7 @@ function renderAlerts() {
       <div class="af"><span class="afc">${a.cadence}</span>｜观测期 ${a.obsPeriod}｜来源发布 ${a.updated}｜核对 ${a.checked}<br>来源: ${a.sources.map(s => `<a href="${s.u}" target="_blank" rel="noopener">${s.l}</a>`).join(' · ')}</div>
     </li>`).join('');
   const c = document.getElementById('climateSummary');
-  if (c) c.innerHTML = `<span class="tag high">El Niño · 加速增强</span>相对NINO3.4 +1.94(BOM 7/26)/+1.2(NOAA 7/9)｜SOI −28.0｜PDO −0.94｜<b>IOD +0.44 首触正阈值</b>　·　官方来源 NOAA 7/9 · BOM 7/28 · 本站核对 ${SOURCE_CHECKED}`;
+  if (c) c.innerHTML = `<span class="tag high">El Niño · 极强</span>相对NINO3.4 +2.02(BOM 至8/2)/+1.2(NOAA 7/9)｜SOI 90天 −21.4｜PDO −0.94｜<b>IOD +0.63 连续两周高于正阈值</b>　·　官方来源 NOAA 7/9 · BOM 8/上旬 · 本站核对 ${SOURCE_CHECKED}`;
 }
 function renderOceanIndices() {
   const sub = document.getElementById('oceanSub');
@@ -1222,13 +1222,13 @@ function generateStrategies(results) {
     const worst = a.regions[a.droughtStreak.indexOf(maxDrought)] || '';
     const heatPct = Math.round(avgHeat / LOOKBACK_DAYS * 100);
     let ensoBonus = 0, ensoNote = '';
-    if (key === 'palm')   { ensoBonus = 0.35; ensoNote = 'BOM 7/28上修:相对NINO3.4 +1.94、IOD首触正阈值+0.44,EN+正IOD叠加是东南亚干旱风险最强组合(但IOD事件尚未确立);EN年棕榈油历史领涨油脂,惟本周原油累跌逾10美元压制整个油脂板块;'; }
+    if (key === 'palm')   { ensoBonus = 0.35; ensoNote = 'BOM 8/上旬:EN已达"极强"阈值(相对NINO3.4 +2.02,至8/2)、IOD连续两周高于正阈值(+0.63),EN+正IOD叠加是东南亚干旱风险最强组合(但IOD事件尚未正式确立);EN年棕榈油历史领涨油脂;'; }
     if (key === 'coffee') { ensoBonus = 0.25; ensoNote = 'EN年7-8月巴西南部霜冻窗口(当前风险低)+采收恢复压价，9-10月开花期偏干为中期支撑；'; }
-    if (key === 'wheat')  { ensoBonus = 0.30; ensoNote = '国际供给端连续下修:SovEcon下调俄麦出口至4460万吨(低于USDA 4750万)、欧盟MARS下调软麦单产至5.88吨/公顷(同比−7%)、巴基斯坦拟进口100万吨;反向是澳麦被上调至3100万吨——但BOM已将EN峰值上修至"或超1950年以来最高",澳麦下半程风险不宜提前解除;美冬麦收获81%、春麦优良率53%持平;'; }
-    if (key === 'soybean'){ ensoBonus = 0.10; ensoNote = '优良率63%(周降3个点)但结荚47%快于均值39%;周二小幅收复(11月+6¼至1220),惟原油本周累跌逾10美元拖累豆油;当日再有12.6万吨售未知目的地,周度出口检验34.9万吨仍低于去年同期42.8万;EN对南美下季播种为潜在扰动;'; }
-    if (key === 'corn')   { ensoBonus = 0.10; ensoNote = '优良率63%为季内新低、周降4个点属7月单周最大跌幅之一(西玉米带主导),周二领涨反弹(12月+6½至480½)+19.7万吨闪电销售;7月产区降水12年最低、表层墒情短缺47%,但未来7天转湿,8月补水成败为定产关键;'; }
+    if (key === 'wheat')  { ensoBonus = 0.30; ensoNote = '黑海出口执行风险恶化:俄7月小麦出口仅160万吨为2017/18以来同期最低、26/27预估下修至4460万吨(港口遭袭+运保费大涨),USDA驻乌武官下调乌26/27小麦出口370万吨;俄麦FOB约$223/吨、买家观望;欧盟MARS软麦单产降至5.88吨/公顷、法国玉米优良率31%为1980年以来最差;周五(8/7)小麦领涨(芝加哥9月+8¼至$6.3975);'; }
+    if (key === 'soybean'){ ensoBonus = 0.10; ensoNote = '优良率63%持平(上年69%)、结荚62%快于均值55%;周五(8/7)大豆小跌(最活跃−1.5¢至$11.7625),但中国本周采购约10船美豆+当日23.8万吨闪电销售,需求端有支撑;EN对南美下季播种为潜在扰动;'; }
+    if (key === 'corn')   { ensoBonus = 0.10; ensoNote = '优良率61%(周降2个点、上年73%)、北达科他恶化最明显,8/10-14西玉米带高温少雨、灌浆期ROD风险升,中央/东部有1-3英寸降雨;8/7收盘持平($4.62)但8/12 WASDE首次田间调查前分歧大,路透预期玉米产量下修约6600万蒲;'; }
     if (key === 'cotton') { ensoBonus = 0.10; ensoNote = '美棉优良率46%(+1)、结铃45%，德州优良率仅34%、表层墒情短缺60%；印度季风受EN压制风险(BOM上修EN强度)+新疆花铃期高温；'; }
-    if (key === 'sugar')  { ensoBonus = 0.25; ensoNote = 'EN年印度/泰国季风偏弱历史上利多糖价,BOM 7/28上修EN强度且IOD首触正阈值强化该逻辑;广西正值伸长期需水关键窗口;'; }
+    if (key === 'sugar')  { ensoBonus = 0.25; ensoNote = 'EN年印度/泰国季风偏弱历史上利多糖价,BOM 8/上旬EN已达"极强"阈值且IOD连续两周高于正阈值强化该逻辑;广西正值伸长期需水关键窗口;'; }
     const heatScore = avgHeat / LOOKBACK_DAYS, droughtScore = maxDrought / LOOKBACK_DAYS;
     const floodScore = Math.max(0, (avgPrecip - 250) / 200);
     const fcHeatScore = (avgFcMax != null && avgFcMax >= HIGH_TEMP_THRESHOLD) ? 0.1 : 0;

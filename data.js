@@ -1,8 +1,8 @@
 // ============================================================
 // 静态数据层 — 由定时任务/人工定期刷新
-// 最后更新: 2026-07-03 (数据来源见各板块)
+// 最后更新: 2026-08-10 (数据来源见各板块)
 // ============================================================
-const STATIC_UPDATED = '2026-07-03';
+const STATIC_UPDATED = '2026-08-10';
 
 // ---------- ENSO 总览 ----------
 const ensoOverview = [
@@ -364,49 +364,56 @@ const cropRegions = [
 ];
 
 // ============================================================
-// 农业新闻 — 仅保留 24-48 小时内消息（定期刷新, 更新于 2026-07-03）
+// 农业新闻 — 仅保留 24-48 小时内消息（定期刷新, 更新于 2026-08-10）
 // ============================================================
 const AG_NEWS = [
   {
-    title: '美玉米带遭遇创纪录热浪：约1.75亿人受影响，授粉期临近推升天气升水',
-    link: 'https://www.farmprogress.com/markets-and-quotes/afternoon-market-recap',
-    date: '7月2日',
-    source: 'Farm Progress',
-    sourceClass: 'agweb',
-  },
-  {
-    title: '南海热带低压今日登陆海南，2026年台风季正式启动（全年预计24-26个）',
-    link: 'https://typhoon.nmc.cn/web.html',
-    date: '7月3日',
-    source: '中央气象台',
+    title: '台风"白海豚"(第13号)8/9傍晚在浙江两度登陆——台州玉环(17:30,14级)、温州乐清(18:40)，浙江防台风响应升至Ⅰ级；恰逢早稻抢收收官(截至8/6进度94%)，未收成熟稻面临倒伏/发芽霉变风险，9-10日浙东、上海中部特大暴雨，残余环流预计8/12起在华北平原现特大暴雨',
+    link: 'https://m.gmw.cn/2026-08/08/content_1304544847.htm',
+    date: '8月10日',
+    source: '中央气象台/光明网',
     sourceClass: 'fao',
   },
   {
-    title: 'CBOT小麦延续涨势：7月芝加哥软红麦收于$5.92/蒲，堪萨斯硬红麦$6.23',
-    link: 'https://www.farmprogress.com/markets-and-quotes/afternoon-market-recap',
-    date: '7月2日',
-    source: 'CBOT行情',
+    title: 'BOM：相对NINO3.4周值(至8/2)升至+2.02°C，为2016年2月以来首次突破"极强"阈值；90天SOI约−21.4，ACCESS-S预测11月峰值约+3.5°C超1902年纪录，事件料延续至2027年初；IOD周值+0.63°C连续两周高于正阈值',
+    link: 'http://www.bom.gov.au/climate/enso/',
+    date: '8月10日',
+    source: 'BOM/Weatherzone',
     sourceClass: 'usda',
   },
   {
-    title: 'USDA作物评级：美玉米优良率68%持平，市场聚焦7月中旬授粉窗口',
-    link: 'https://www.profarmer.com/pro-farmer-max/crops-analysis/crops-analysis-nearby-corn-forges-contract-low-close',
-    date: '7月1日',
-    source: 'USDA/Pro Farmer',
+    title: 'CBOT(8/7)小麦领涨：芝加哥9月+8¼¢收$6.3975(黑海风险+美元走弱)，玉米持平$4.62、大豆−1.5¢至$11.7625；USDA当日闪电销售28.6万吨玉米至墨西哥、23.8万吨大豆至中国，中国本周传闻采购约10船美豆；市场聚焦8/12 WASDE首次田间调查',
+    link: 'https://www.680kfeq.com/2026/08/07/closing-markets-friday-august-7-2026/',
+    date: '8月10日',
+    source: 'CBOT/680KFEB',
     sourceClass: 'usda',
   },
   {
-    title: '美国乙醇日产量升至111.7万桶，创3月初以来新高，提振玉米工业需求',
-    link: 'https://www.farmprogress.com/markets-and-quotes/morning-market-review',
-    date: '7月2日',
-    source: 'EIA/Farm Progress',
-    sourceClass: 'agweb',
+    title: '黑海小麦出口执行风险恶化：俄7月小麦出口160万吨为2017/18以来同期最低，26/27出口预估下修至4460万吨；亚速海/刻赤海峡港口受限、塔曼码头受损、乌敖德萨等港口商业交通停摆，运保费大涨，俄麦FOB约$223/吨',
+    link: 'https://blog.sizov.report/russia-wheat-exports-in-july-lowest-since-2017-18/',
+    date: '8月10日',
+    source: 'SovEcon Sizov Report',
+    sourceClass: 'usda',
   },
   {
-    title: '气象预报：7月4日假期后玉米带热浪缓和，中旬西太台风活动或拉低美国气温',
-    link: 'https://www.farmprogress.com/marketing/july-heat-dry-periods-threaten-corn-pollination',
-    date: '7月2日',
-    source: 'Farm Progress',
+    title: 'USDA作物进度(截至8/2)：玉米优良好率61%(周降2个点)、大豆63%持平，北达科他恶化最明显；8/10-14西玉米带高温少雨、灌浆期快速干旱风险上升，中央及东部有1-3英寸降雨；等待8/12 WASDE单产修正',
+    link: 'https://www.agrexinc.com/story-usda-corn-declines-61-soybeans-63-good-excellent-condition-8-267248',
+    date: '8月10日',
+    source: 'USDA/DTN',
+    sourceClass: 'usda',
+  },
+  {
+    title: '欧盟谷物供给收缩：法国玉米优良率降至31%，为1980年以来同期最差；USDA驻乌武官下调乌26/27小麦出口370万吨、玉米出口约900万吨；全球小麦供给由"舒适"转向"紧平衡"',
+    link: 'https://www.graincentral.com/markets/daily-market-wire-10-august-2026/',
+    date: '8月10日',
+    source: 'Grain Central/USDA',
+    sourceClass: 'fao',
+  },
+  {
+    title: '中国东北产区天气分化：黑龙江/吉林北部降水50-100mm、低洼地块过湿渍涝，辽宁/吉林南部35-38°C高温热害；8/12-16"白海豚"残涡携冷空气将给东北南部带来大到暴雨，中央气象台提示防范农田渍涝与病虫害',
+    link: 'https://www.cma.gov.cn/2011xwzx/2011xqxxw/2011xtpxw/202608/t20260810_7978197.html',
+    date: '8月10日',
+    source: '中央气象台',
     sourceClass: 'fao',
   },
 ];
