@@ -28,6 +28,9 @@ jobs:
       - name: Run fetch script
         run: python3 scripts/fetch_official.py
 
+      - name: Probe image sources
+        run: python3 scripts/probe_sources.py
+
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions[bot]"

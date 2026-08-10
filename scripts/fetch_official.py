@@ -85,6 +85,71 @@ def parse_cpc_nino34():
     }
 
 
+def pdo_phase(v):
+    """PDO 以指数符号定相位(JMA口径), 绝对值<0.5 弱化标注。"""
+    if v >= 0.5: return "正相位"
+    if v > 0: return "弱正相位"
+    if v <= -0.5: return "负相位"
+    return "弱负相位"
+
+
+def ao_phase(v):
+    if v >= 1.0: return "正相位"
+    if v <= -1.0: return "负相位"
+    return "中性"
+
+
+def iod_phase(v):
+    """IOD 事件阈值 ±0.4 (BOM/常用口径)。"""
+    if v >= 0.4: return "正IOD"
+    if v <= -0.4: return "负IOD"
+    return "中性"
+
+
+def latest_month_from_wide(data, missing):
+    """宽表 'Year m1 m2 ... m12' → (year, month, value), 跳过缺测占位(missing)。"""
+    if isinstance(data, bytes):
+        data = data.decode("utf-8", "ignore")
+    rows = [l.split() for l in data.splitlines() if l.strip() and l[0].isdigit() and len(l) >= 13]
+    last = rows[-1]
+    y = int(last[0])
+    vals = []
+    for i, v in enumerate(last[1:13], 1):
+        try:
+            f = float(v)
+        except ValueError:
+            continue
+        if f == missing:
+            continue
+        vals.append((i, f))
+    if not vals:
+        raise ValueError("宽表无有效月值")
+    m, v = vals[-1]
+    return y, m, v
+
+
+def parse_ncei_pdo():
+    """NOAA NCEI ERSST v5 PDO 指数: 宽表 'Year Jan..Dec', 99.99=缺测。"""
+    d = fetch("https://www.ncei.noaa.gov/pub/data/cmb/ersst/v5/index/ersst.v5.pdo.dat")
+    y, m, v = latest_month_from_wide(d, 99.99)
+    return {"value": round(v, 2), "month": f"{y}-{m:02d}", "phase": pdo_phase(v)}
+
+
+def parse_cpc_ao():
+    """NOAA CPC AO 日值: 纯文本 '年 月 日 值', 与 NAO 同目录同构。"""
+    d = fetch("ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii")
+    lines = [l.split() for l in d.decode("ascii", "ignore").splitlines() if l.strip()]
+    y, m, day, v = lines[-1][:4]
+    return {"value": round(float(v), 3), "date": f"{y}-{int(m):02d}-{int(day):02d}", "phase": ao_phase(float(v))}
+
+
+def parse_psl_iod():
+    """NOAA PSL 印度洋偶极子 DMI(基于 HadISST1.1): 宽表, -9999=缺测, 官方标注 Preliminary(滞后约2月)。"""
+    d = fetch("https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/dmi.had.long.data")
+    y, m, v = latest_month_from_wide(d, -9999.0)
+    return {"value": round(v, 3), "month": f"{y}-{m:02d}", "phase": iod_phase(v), "prelim": True}
+
+
 def parse_nmc_midrange():
     """中央气象台《中期天气预报》公报全文快照(服务端渲染, 去脚本/样式后存正文)。"""
     d = fetch("http://www.nmc.cn/publish/bulletin/mid-range.htm")
@@ -237,12 +302,18 @@ def main():
     sources = {
         "nao": {"label": "NOAA CPC NAO 日值", "url": "ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii"},
         "nino34": {"label": "CPC NINO3.4 周值", "url": "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"},
+        "pdo": {"label": "NOAA NCEI PDO (ERSST v5)", "url": "https://www.ncei.noaa.gov/pub/data/cmb/ersst/v5/index/ersst.v5.pdo.dat"},
+        "ao": {"label": "NOAA CPC AO 日值", "url": "ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii"},
+        "iod": {"label": "NOAA PSL DMI (HadISST)", "url": "https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/dmi.had.long.data"},
         "midrange": {"label": "中央气象台《中期天气预报》快照", "url": "http://www.nmc.cn/publish/bulletin/mid-range.htm"},
         "typhoon": {"label": "中央气象台台风网 实时台风", "url": "https://typhoon.nmc.cn/"},
     }
     parsers = {
         "nao": parse_cpc_nao,
         "nino34": parse_cpc_nino34,
+        "pdo": parse_ncei_pdo,
+        "ao": parse_cpc_ao,
+        "iod": parse_psl_iod,
         "midrange": parse_nmc_midrange,
         "typhoon": parse_cma_typhoon,
     }
