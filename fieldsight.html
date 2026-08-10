@@ -219,6 +219,36 @@ td.risk { color:var(--red); font-weight:600; }
 .event-card .edesc { font-size:0.82rem; color:var(--ink); margin:9px 0 8px; line-height:1.62; }
 .event-card .esrc { font-size:0.72rem; color:var(--ink2); }
 
+/* 柒 生育期表：来源列与参考来源脚注 */
+.cal-note { border:1px dashed var(--line); background:var(--paper); padding:10px 14px; font-size:0.8rem; line-height:1.72; margin-bottom:12px; }
+.cal-src { font-size:0.72rem; line-height:1.55; margin-top:4px; }
+.cal-src a { color:var(--green); }
+.cal-srcdate { color:var(--ink2); }
+.cal-unv { font-size:0.72rem; color:var(--red); }
+.cal-refs { margin-top:14px; border-top:1px solid var(--line); padding-top:11px; }
+.cal-refs-t { font-weight:700; font-size:0.85rem; margin-bottom:7px; }
+.cal-refs ol { margin:0 0 8px 0; padding-left:22px; }
+.cal-refs li { font-size:0.79rem; line-height:1.75; margin-bottom:3px; }
+.cal-refs li a { color:var(--green); }
+.cal-refs-n { font-size:0.76rem; color:var(--ink2); line-height:1.7; }
+/* 拾壹 影响推演：官方事实(冷灰底) 与 本站推断(纸面底+左描边) 视觉区分 */
+.ol-method { border:1px dashed var(--line); background:var(--paper); padding:11px 14px; font-size:0.82rem; line-height:1.75; margin-bottom:14px; color:var(--ink); }
+.ol-facts { display:flex; flex-direction:column; gap:9px; }
+.ol-fact { border-left:3px solid var(--green); background:var(--panel2); padding:9px 13px; }
+.ol-fact-t { font-weight:700; font-size:0.84rem; margin-bottom:3px; }
+.ol-fact-d { font-size:0.82rem; line-height:1.72; }
+.ol-card { border:1px solid var(--line); border-left:4px solid var(--amber); background:var(--panel); padding:12px 15px; margin-bottom:11px; }
+.ol-head { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-bottom:7px; }
+.ol-crop { font-weight:700; font-size:0.95rem; }
+.ol-region { font-weight:600; font-size:0.86rem; }
+.ol-stage { font-size:0.78rem; color:var(--ink2); }
+.ol-badges { margin-left:auto; display:flex; flex-wrap:wrap; gap:5px; }
+.ol-driver, .ol-mech, .ol-watch { font-size:0.81rem; line-height:1.72; margin-top:5px; }
+.ol-driver { color:var(--ink); }
+.ol-mech { padding-left:9px; border-left:2px solid var(--amber); }
+.ol-watch { color:var(--ink2); }
+@media (max-width:640px){ .ol-badges { margin-left:0; width:100%; } }
+
 /* ---------- 源预览卡（中国强对流 / 台风监测） ---------- */
 .src-card { display:block; text-decoration:none; color:var(--ink); background:#fff; border:1px solid var(--line); border-top:3px solid var(--line2); padding:14px 14px 12px; transition:transform .12s, border-color .12s; }
 .src-card:hover { transform:translateY(-2px); border-top-color:var(--green); }
@@ -440,6 +470,11 @@ footer { border-top-color:var(--line2); }
 <section class="sec" data-key="typhoon">
   <div class="sec-head" onclick="toggleSec(this)"><span class="num">拾</span><h2>台风监测</h2><span class="sub">可视化路径/警报面板 · 中央气象台台风网 + JTWC · 官方直达</span><span class="tog">[−]</span></div>
   <div class="sec-body" id="typhoonSection"></div>
+</section>
+
+<section class="sec" data-key="cnoutlook">
+  <div class="sec-head" onclick="toggleSec(this)"><span class="num">拾壹</span><h2>极端天气 → 中国农产品影响推演</h2><span class="sub" id="cnOutlookSub">未来10-14天 · 官方预报为据 · 影响判断为本站条件性推断</span><span class="tog">[−]</span></div>
+  <div class="sec-body" id="cnOutlookSection"></div>
 </section>
 
 <footer>
@@ -1272,11 +1307,29 @@ function renderCalendar(results) {
     const color = (heat || dr) ? 'var(--red)' : wet ? 'var(--blue)' : 'var(--green)';
     return `<span style="color:${color};font-size:0.78rem;">${m.avgTemp}°C/${m.sumPrecip}mm${heat}${dr}${wet}${ok}</span>`;
   }
+  const srcCell = c => {
+    if (!c.src) return '<span class="cal-unv">未标注来源</span>';
+    const badge = c.verified
+      ? '<span class="tag low">已核实</span>'
+      : '<span class="tag mid">未逐站核实</span>';
+    return `${badge}<div class="cal-src"><a href="${c.srcUrl}" target="_blank" rel="noopener">${c.src}</a><br><span class="cal-srcdate">${c.srcDate}</span></div>`;
+  };
+  const nVer = cropCalendar.filter(c => c.verified).length;
   document.getElementById('calendarSection').innerHTML = `
+    <div class="cal-note">
+      <b>数据口径</b>：本表「当前生长阶段」一律以外部权威机构发布的<b>逐站/逐省物候统计</b>为准，不采用本站自行推断；「核心风险」为官方实况/预报原文 + 本站气象分析的结合，官方原文以引号标出。
+      中国各行来自中央气象台《全国农业气象周报》附表2-5的逐省测站发育期统计，美国各行来自 USDA Crop Progress 原始件（优良率由本站将 Good+Excellent 两列相加得出）。
+      标注「未逐站核实」的行，表示该机构未发布对应逐期物候统计，阶段为常规农学判断，<b>不应作为方向性依据</b>。当前 ${nVer}/${cropCalendar.length} 行已核实到官方原始统计。
+    </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>作物</th><th>产区</th><th>当前生长阶段</th><th>气象敏感期</th><th>核心风险</th><th>ENSO影响</th><th>实时气象(代表站)</th></tr></thead>
-      <tbody>${cropCalendar.map((c, i) => `<tr><td>${c.crop}</td><td>${c.region}</td><td>${c.season}</td><td>${c.sensitive}</td><td class="risk">${c.risk}</td><td style="font-size:0.8rem;">${c.enso}</td><td>${cell(i)}</td></tr>`).join('')}</tbody>
-    </table></div>`;
+      <thead><tr><th>作物</th><th>产区</th><th>当前生长阶段</th><th>气象敏感期</th><th>核心风险（官方原文＋本站分析）</th><th>ENSO影响</th><th>实时气象(代表站)</th><th>来源与核实状态</th></tr></thead>
+      <tbody>${cropCalendar.map((c, i) => `<tr><td>${c.crop}</td><td>${c.region}</td><td>${c.season}</td><td>${c.sensitive}</td><td class="risk">${c.risk}</td><td style="font-size:0.8rem;">${c.enso}</td><td>${cell(i)}</td><td>${srcCell(c)}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="cal-refs">
+      <div class="cal-refs-t">📚 本章参考来源</div>
+      <ol>${(typeof CALENDAR_SOURCES !== 'undefined' ? CALENDAR_SOURCES : []).map(s => `<li><a href="${s.u}" target="_blank" rel="noopener">${s.l}</a></li>`).join('')}</ol>
+      <div class="cal-refs-n">更新节奏：中央气象台《全国农业气象周报》每周一发布（统计上一周一至周日）；USDA Crop Progress 每周一美东16:00发布（数据截至前一周日）。两者更新后本表随之复核。</div>
+    </div>`;
 }
 function renderSpecialEvents() {
   const el = document.getElementById('eventsSection');
@@ -1293,6 +1346,88 @@ function renderSpecialEvents() {
       <div class="esrc">来源: ${e.sources.map(s => `<a href="${s.u}" target="_blank" rel="noopener">${s.l} ↗</a>`).join(' · ')}</div>
     </div>`).join('')}</div>`;
 }
+// ---------- 拾壹 极端天气→中国农产品影响推演（官方事实 与 本站推断 分区呈现） ----------
+function outlookRow(r) {
+  const impactCls = /偏不利/.test(r.impact) ? 'bad' : (/偏有利/.test(r.impact) ? 'good' : 'neu');
+  const lvCls = r.level === '高' ? 'high' : (r.level === '中' ? 'mid' : 'low');
+  const cfCls = r.conf === '高' ? 'high' : (r.conf === '中' ? 'mid' : 'low');
+  return `
+    <div class="ol-card">
+      <div class="ol-head">
+        <span class="ol-crop">${r.crop}</span><span class="ol-region">${r.region}</span>
+        <span class="ol-stage">${r.stage}</span>
+        <span class="ol-badges">
+          <span class="tag ${impactCls === 'bad' ? 'high' : impactCls === 'good' ? 'low' : 'mid'}">产量影响 ${r.impact}</span>
+          <span class="tag ${lvCls}">风险 ${r.level}</span>
+          <span class="tag ${cfCls}">置信度 ${r.conf}</span>
+        </span>
+      </div>
+      <div class="ol-driver"><b>官方预报依据</b>：${r.driver}</div>
+      <div class="ol-mech"><b>传导机制（本站推断）</b>：${r.mech}</div>
+      <div class="ol-watch"><b>后续验证点</b>：${r.watch}</div>
+    </div>`;
+}
+function renderCnAgriOutlook() {
+  const c = CN_AGRI_OUTLOOK;
+  const sub = document.getElementById('cnOutlookSub');
+  if (sub) sub.innerHTML = `${c.horizon}　<span class="tag mid">官方基准 ${c.issuedAt}</span>本站核对 ${c.checked}`;
+  const el = document.getElementById('cnOutlookSection');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="ol-method">
+      <b>方法与边界</b>：下方「官方预报事实」逐条摘自 <a href="${c.srcUrl}" target="_blank" rel="noopener">${c.srcName}</a>（${c.issuedAt}；${c.forecaster}），数值与落区均为原文，未作改写或外推。
+      「影响推演」为本站基于该预报的<b>条件性推断</b>，按既定口径<b>只给方向、风险等级与传导机制，不给单产百分比</b>——农业产量受品种、管理、灌溉与灾后恢复等多因素共同决定，单凭降水预报无法定量。置信度含义：高=预报明确覆盖该产区且量级清晰；中=落区覆盖但强度分布仍有分歧；低=预报未明确覆盖，仅由反向表述推得。
+    </div>
+
+    <details class="ig" open>
+      <summary>📋 官方预报事实（可核实） <span class="src">— ${c.srcName} · ${c.issuedAt}</span><span class="mk"></span></summary>
+      <div class="ig-body"><div class="ol-facts">
+        ${c.official.map(o => `<div class="ol-fact"><div class="ol-fact-t">${o.t}</div><div class="ol-fact-d">${o.d}</div></div>`).join('')}
+      </div></div>
+    </details>
+
+    <details class="ig" open>
+      <summary>🌾 北方产区 · 影响推演 <span class="src">— 本站条件性推断，非官方结论</span><span class="mk"></span></summary>
+      <div class="ig-body">${c.north.map(outlookRow).join('')}</div>
+    </details>
+
+    <details class="ig" open>
+      <summary>🌴 南方产区 · 影响推演 <span class="src">— 本站条件性推断，非官方结论</span><span class="mk"></span></summary>
+      <div class="ig-body">${c.south.map(outlookRow).join('')}
+        <div class="conv-note">${c.note}</div>
+      </div>
+    </details>
+
+    <details class="ig">
+      <summary>🏜️ 干旱严重程度指标 · 全国农业干旱综合监测 <span class="src">— 中央气象台 AMDF · 逐日08时 · <span id="olDroughtLabel">探测最新时次中…</span></span><span class="mk"></span></summary>
+      <div class="ig-body"><div class="img-grid" id="olDroughtGrid" style="grid-template-columns:minmax(300px,1fr);">
+        <div class="note" style="padding:24px 0;text-align:center;">⏳ 正在探测最新干旱监测图…</div>
+      </div>
+      <div class="conv-note">该图为官方综合干旱指数分级，可与「叁 中国·预报图」的土壤墒情(10-50cm)交叉验证。本轮北方以强降水为主要矛盾，干旱指标的价值在于确认前期旱区是否已被本轮降水解除。 <a class="conv-srclink" href="${c.droughtImg.srcPage}" target="_blank" rel="noopener">查看来源 ↗</a></div>
+      </div>
+    </details>`;
+  resolveOutlookDrought();
+}
+async function resolveOutlookDrought() {
+  const cfg = CN_AGRI_OUTLOOK.droughtImg;
+  const grid = document.getElementById('olDroughtGrid'), lb = document.getElementById('olDroughtLabel');
+  if (!grid) return;
+  let hit = null;
+  for (let off = 0; off <= cfg.lookbackDays; off++) {
+    const p = bjtDateParts(off);
+    const url = cfg.tpl.replace(/\{Y\}/g, p.y).replace(/\{M\}/g, p.m).replace(/\{D\}/g, p.d);
+    if (await probeImage(url)) { hit = { url, p }; break; }
+  }
+  if (!hit) {
+    if (lb) lb.textContent = '暂未探测到可用图';
+    grid.innerHTML = `<div class="fallback" style="display:block;">⚠️ 干旱监测图暂不可用 · <a href="${cfg.srcPage}" target="_blank" rel="noopener">前往来源查看 ↗</a></div>`;
+    return;
+  }
+  const day = `${+hit.p.m}/${+hit.p.d}`;
+  if (lb) lb.textContent = `观测 ${day} 北京时08时`;
+  grid.innerHTML = imgCell(cfg.label, hit.url, `中央气象台 农业干旱综合监测 · 观测 ${day} 北京时08时 · 点击放大`);
+}
+
 // 台风监测面板：可视警报图(随报更新, 失败有 fallback) + 官方源预览直达。数据见 fieldsight-data.js 的 TYPHOON_MONITOR。
 // 台风监测：工具栏切换嵌入图层(Ventusky风/雨 → NMC官方路径iframe → JTWC静态图)，链接仅兜底
 function renderTyphoonPanel() {
@@ -1574,6 +1709,7 @@ async function init() {
   renderStrategy(null);
   renderNews();
   renderTyphoonPanel();
+  renderCnAgriOutlook();
   renderCropSkeletons();
   findWawCropId();
 
