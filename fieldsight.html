@@ -1323,11 +1323,18 @@ function generateStrategies(results) {
   return out.sort((a, b) => b.score - a.score);
 }
 function renderStrategy(results) {
-  const s = results ? generateStrategies(results) : [];
+  // 规则: 手写注记数据截止日超期 / 气象数据未加载 / 无策略可展示 → 整个"策略观察"板块隐藏(过时不展示, 不显示占位)
+  const sec = document.querySelector('.sec[data-key="strategy"]');
+  if (sec) sec.style.display = 'none';
+  if (!results) return;                                   // 气象数据未加载 → 隐藏
+  const cutoff = (typeof STRATEGY_NOTE_DATE !== 'undefined') ? Date.parse(STRATEGY_NOTE_DATE) : NaN;
+  const maxAge = (typeof STRATEGY_MAX_AGE_DAYS !== 'undefined' ? STRATEGY_MAX_AGE_DAYS : 2) * 86400e3;
+  if (!isNaN(cutoff) && (Date.now() - cutoff) > maxAge) return;  // 注记已过时 → 隐藏
+  const s = generateStrategies(results);
+  if (!s.length) return;                                  // 无可展示策略 → 隐藏
+  if (sec) sec.style.display = '';
   const txt = { danger:'强烈关注', warn:'关注', info:'中性/跟踪' };
-  document.getElementById('strategyBox').innerHTML = s.length
-    ? s.map(x => `<li><span class="lvl ${x.level}">${txt[x.level]}</span><b>${x.crop}</b>　${x.detail}</li>`).join('')
-    : '<li style="color:var(--ink2);">⏳ 等待气象数据加载完成后自动生成…</li>';
+  document.getElementById('strategyBox').innerHTML = s.map(x => `<li><span class="lvl ${x.level}">${txt[x.level]}</span><b>${x.crop}</b>　${x.detail}</li>`).join('');
 }
 
 const calendarMatch = [
@@ -1376,11 +1383,22 @@ function renderCalendar(results) {
       <div class="cal-refs-n">更新节奏：中央气象台《全国农业气象周报》每周一发布（统计上一周一至周日）；USDA Crop Progress 每周一美东16:00发布（数据截至前一周日）。两者更新后本表随之复核。</div>
     </div>`;
 }
+function hideSec(key) {
+  const s = document.querySelector('.sec[data-key="' + key + '"]');
+  if (s) s.style.display = 'none';
+}
+// 特殊天气事件: 每条带 date(发布/最近更新日), 只停留 3 天, 过期移除; 无事件则整个板块隐藏(不显示空态)。
 function renderSpecialEvents() {
   const el = document.getElementById('eventsSection');
   if (!el) return;
-  const evs = (typeof SPECIAL_EVENTS !== 'undefined' ? SPECIAL_EVENTS : []);
-  if (!evs.length) { el.innerHTML = '<div style="color:var(--ink2);font-size:0.85rem;">暂无重大天气事件记录。</div>'; return; }
+  const EVENTS_MAX_AGE_DAYS = 3;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const evs = (typeof SPECIAL_EVENTS !== 'undefined' ? SPECIAL_EVENTS : []).filter(e => {
+    if (!e.date) return false;                       // 无日期按过期处理(不编造)
+    const t = new Date(e.date);
+    return !isNaN(t) && (today - t) / 86400e3 <= EVENTS_MAX_AGE_DAYS;
+  });
+  if (!evs.length) { hideSec('events'); return; }
   el.innerHTML = `<div class="event-grid">${evs.map(e => `
     <div class="event-card ${e.cls}">
       <div class="ehead"><span class="eic">${e.icon}</span><h4>${e.title}</h4><span class="tag ${e.cls}">${e.severity}</span></div>
@@ -1575,14 +1593,9 @@ function renderNews() {
       <a href="https://www.agriculture.com/news" target="_blank" rel="noopener">Agriculture.com</a> ·
       <a href="https://typhoon.nmc.cn/web.html" target="_blank" rel="noopener">中央气象台台风网</a>
     </div>`;
-  if (!fresh.length) {
-    document.getElementById('newsSection').innerHTML = `
-      <div style="text-align:center;color:var(--ink2);font-size:0.85rem;border:1px dashed var(--line2);background:var(--panel);padding:26px 14px;">
-        📭 近${winH}小时暂无新收录的要闻。<br>
-        <span style="font-size:0.78rem;">仅展示${winH}小时内消息，更早消息已自动隐去；可点下方官方新闻源查看最新动态。</span>
-      </div>${srcBar}`;
-    return;
-  }
+  if (!fresh.length) { hideSec('news'); return; }   // 无12h内新消息 → 整个板块隐藏(不显示空态/占位)
+  const secNews = document.querySelector('.sec[data-key="news"]');
+  if (secNews) secNews.style.display = '';
   document.getElementById('newsSection').innerHTML = `
     <ul class="news-list">
       ${fresh.map(n => `<li><span class="d">${n.date}</span><span class="t"><a href="${n.link}" target="_blank" rel="noopener">${n.title}</a></span><span class="s">${n.source}</span></li>`).join('')}

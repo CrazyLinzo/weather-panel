@@ -616,47 +616,55 @@ const AG_NEWS = [
 ];
 
 // ============================================================
+// 捌·策略观察 — 手写注记的数据截止日(每次更新策略注记时同步改这里)。
+// 超过 STRATEGY_MAX_AGE_DAYS 天则整个"策略观察"板块隐藏(过时不展示)。
+// ============================================================
+const STRATEGY_NOTE_DATE = '2026-08-10';
+const STRATEGY_MAX_AGE_DAYS = 2;
+
+// ============================================================
 // 特殊天气事件 — 台风/高温/强降水/霜冻等重大天气（静态参考, 更新于 2026-08-10）
+// 规则: 每条带 date(发布/最近更新日), 只停留 EVENTS_MAX_AGE_DAYS(3) 天, 过期自动删除; 无事件则板块隐藏。
 // severity 用 tag 分级: severe(白字红底)/high(红)/mid(琥珀)/low(墨绿)
 // ============================================================
 const SPECIAL_EVENTS = [
   {
-    icon:'🌀', title:'台风"白海豚"8/9浙江两度登陆，早稻收官期遇强风雨', severity:'强台风·特大暴雨', cls:'high', status:'浙江防台Ⅰ级响应',
+    icon:'🌀', title:'台风"白海豚"8/9浙江两度登陆，早稻收官期遇强风雨', severity:'强台风·特大暴雨', cls:'high', status:'浙江防台Ⅰ级响应', date:'2026-08-09',
     region:'浙东/上海(特大暴雨) · 后续华北(8/12起特大暴雨风险)',
     time:'8/9登陆 · 8/10-12持续降雨',
     detail:'第13号台风"白海豚"8/9 17:30在台州玉环登陆(14级/42m/s)、18:40在温州乐清二次登陆，浙江防台风应急响应升至Ⅰ级。恰逢全省早稻抢收收官：截至8/6收获进度94%(208.3万亩)，未收成熟稻面临倒伏、谷粒发芽霉变风险，各地"人停机不停"抢收。9-10日浙东、上海中部出现暴雨至特大暴雨，单点累计或超500mm，低洼农田渍涝风险高。残余环流北上与冷空气结合，预计8/12起华北平原(山东/河南/京津冀)现特大暴雨，威胁玉米/水稻等秋粮。8/8-9一度与"灿鸿(第15号)""琵鹭(第16号)"构成三台共舞。',
     sources:[ { l:'CCTV 台风路径分析', u:'https://m.gmw.cn/2026-08/08/content_1304544847.htm' }, { l:'浙江农业系统防台', u:'https://agri.hangzhou.gov.cn/col/col1229708901/art/2026/art_49657d2c67a142329b5383d43905d07b.html' }, { l:'新华 浙江抢收一线', u:'http://www.zhejiang.xinhua.org/20260810/c36ecdb6b94b420598a1cb1eeb534391/c.html' } ],
   },
   {
-    icon:'🌽', title:'美玉米带8月上旬"西旱东湿"分化，8/12 WASDE成关键节点', severity:'高温干旱·单产分歧', cls:'high', status:'优良率61%',
+    icon:'🌽', title:'美玉米带8月上旬"西旱东湿"分化，8/12 WASDE成关键节点', severity:'高温干旱·单产分歧', cls:'high', status:'优良率61%', date:'2026-08-10',
     region:'西玉米带(爱荷华/内布拉斯加/达科他·重) · 中央及东部(有雨)',
     time:'8/10-14 · 8/12 WASDE',
     detail:'USDA(截至8/2)：玉米优良好率61%(周降2个点、上年73%)、大豆63%持平(上年69%)，北达科他恶化最明显；发育快于均值(玉米吐丝90%/乳熟43%/首批见齿6%)。8/10-14中西部普遍偏暖，西玉米带高温少雨、灌浆期快速干旱(ROD)风险上升，中央及东部有1-3英寸降雨缓解。7月降水为2014年以来最少(3.42英寸)的干旱背景仍在，市场焦点转向8/12 WASDE首次田间调查：路透预期玉米产量下修约6600万蒲至159.34亿蒲、单产预估180.8-184.8区间分歧大。',
     sources:[ { l:'USDA Crop Progress 8/3(截至8/2)', u:'https://www.agrexinc.com/story-usda-corn-declines-61-soybeans-63-good-excellent-condition-8-267248' }, { l:'WASDE预期(路透)', u:'https://www.agcanada.com/daily/cbot-weekly-analysts-predict-smaller-corn-soy-crops-in-august-wasde-report' }, { l:'Climate Impact 西部风险', u:'https://climateimpactcompany.com/ag-market-hot-spot-rains-this-week-western-corn-belt-heat-dryness-to-follow-2/' } ],
   },
   {
-    icon:'🏜️', title:'美国墒情偏紧延续：作物评级连降，西/北部平原重旱', severity:'墒情偏紧', cls:'high', status:'玉米优良率季内新低',
+    icon:'🏜️', title:'美国墒情偏紧延续：作物评级连降，西/北部平原重旱', severity:'墒情偏紧', cls:'high', status:'玉米优良率季内新低', date:'2026-08-03',
     region:'内布拉斯加 · 达科他 · 科罗拉多/怀俄明 · 冬麦带',
     time:'USDA口径 最新周报至8/2(墒情细项截至7/26)',
     detail:'USDA周度报告(截至8/2)作物评级连续第二周下滑，北达科他等旱区恶化最明显，Poor/Very Poor升至14%(上年同期7%)；墒情细项(截至7/26)：48州表层土壤"短缺+严重短缺"合计47%(一周前41%、上年26%)、深层45%，怀俄明86%/科罗拉多89%/南达科他75%/内布拉斯加72%处重旱。全美草场与牧地优良率29%(上年45%)。注：墒情为USDA调查口径，与US Drought Monitor(每周四发布)分级不同，可互相印证。',
     sources:[ { l:'USDA Crop Progress 8/3', u:'https://www.agrexinc.com/story-usda-corn-declines-61-soybeans-63-good-excellent-condition-8-267248' }, { l:'US Drought Monitor', u:'https://droughtmonitor.unl.edu/' } ],
   },
   {
-    icon:'🌾', title:'欧洲麦类/玉米减产确认：法国玉米为1980年以来同期最差', severity:'减产确认', cls:'high', status:'法玉米优良率31%',
+    icon:'🌾', title:'欧洲麦类/玉米减产确认：法国玉米为1980年以来同期最差', severity:'减产确认', cls:'high', status:'法玉米优良率31%', date:'2026-08-10',
     region:'德国 · 法国 · 乌克兰(出口受损)',
     time:'2026收获季 · 8月持续跟踪',
     detail:'德国合作社DRV：2026年小麦产量预估同比-12%至19.9MMT(高温致早熟、粒重与单产下降)。法国受热浪减产(软麦单产估降约7%)，玉米优良率降至31%、为1980年以来同期最差；FranceAgriMer 上调25/26出口。乌克兰因港口基础设施受损，USDA驻乌武官初步评估下调26/27小麦出口370万吨、玉米出口约900万吨，进一步收紧欧盟及全球供给。',
     sources:[ { l:'Reuters/DRV', u:'https://www.reuters.com/markets/commodities/' }, { l:'Grain Central 8/10', u:'https://www.graincentral.com/markets/daily-market-wire-10-august-2026/' }, { l:'FranceAgriMer', u:'https://www.franceagrimer.fr/' } ],
   },
   {
-    icon:'🌧️', title:'中国东北产区天气分化：北部过湿、南部高温', severity:'渍涝+高温热害', cls:'high', status:'一喷多促作业推进',
+    icon:'🌧️', title:'中国东北产区天气分化：北部过湿、南部高温', severity:'渍涝+高温热害', cls:'high', status:'一喷多促作业推进', date:'2026-08-10',
     region:'黑龙江/吉林北部(过湿) · 辽宁/吉林南部(高温)',
     time:'8月上旬 · 8/12-16残涡大雨',
     detail:'黑龙江大部/吉林北部8/2-8降水50-100mm(局地100mm+)，墒情转好但低洼地块过湿渍涝、大豆根系缺氧结荚受阻；辽宁及吉林南部2-8日气温偏高2-4°C、最高35-38°C，玉米灌浆乳熟期高温热害、千粒重下降风险升，大部墒情尚适宜。8/12-16"白海豚"残涡与冷空气将给东北南部带来大到暴雨，需防低洼农田渍涝。各地推进"一喷多促"并滚动发布墒情与灾害预警。',
     sources:[ { l:'中央气象台 未来10天提示(8/10)', u:'https://www.cma.gov.cn/2011xwzx/2011xqxxw/2011xtpxw/202608/t20260810_7978197.html' }, { l:'黑龙江多轮降雨', u:'https://zmt-m.hljtv.com/news_details.html?id=1149073&timestamp=1785976110389' } ],
   },
   {
-    icon:'❄️', title:'巴西南部霜冻窗口(当前风险低)', severity:'霜冻窗口·尾部风险', cls:'mid', status:'当前风险低',
+    icon:'❄️', title:'巴西南部霜冻窗口(当前风险低)', severity:'霜冻窗口·尾部风险', cls:'mid', status:'当前风险低', date:'2026-07-16',
     region:'南米纳斯 · 塞拉多 · 圣保罗 · 巴拉那',
     time:'7-8月霜冻窗口',
     detail:'7-8月南部霜冻窗口仍开，但近期预报主产区无霜冻、严重寒潮风险低。采收恢复压制价格，阿拉比卡7/16跌约4%至约$3.14/磅后维持弱势。中期支撑更多转向 El Niño 对9-10月开花期(下季作物)可能偏干的影响——本轮 El Niño 已达"极强"，需持续跟踪。',
