@@ -149,35 +149,48 @@ const usWeatherImages = [
 ];
 
 // ============================================================
-// World Ag Weather — GEFS 集合预报图 (运行ID自动探测)
-// 锚点: 2026-07-02 时 ID=3121; 每天约递增2-4个, 旧图保留
-// 页面加载时从估算上界向下探测第一个可用ID
+// World Ag Weather — 美国预报图集 (imgnum 动态编号, 2026-08-10 重写)
+// URL 依赖每日递增的 imgnum, 由服务端 probe_sources.py 每日解析
+// getimglabs.pl + NOAA SPC 发布时次后, 生成 data/img-sources.js 的
+// AUTO_IMG_SOURCES.waw.urls 完整映射; 前端直接消费, 不再浏览器探测。
+// 图集结构对齐日报脚本 generate_report.py 的"美国天气"部分。
 // ============================================================
 const WAW_CONFIG = {
-  anchorId: 3121,
-  anchorDate: '2026-07-02',
-  perDay: 4,        // 每日ID增量上限估计
-  margin: 6,        // 探测上界额外余量
-  maxProbe: 60,     // 最多向下探测次数
-  probeTpl: 'https://www.worldagweather.com/fcstwx/pcp_gefs_day1_q50_us_{ID}.png',
   groups: [
-    { group:'🌧️ 美国7天降水预报 (GEFS集合)', source:'World Ag Weather · 运行ID自动探测',
-      images:[
-        { title:'第1天累计降水', tpl:'https://www.worldagweather.com/fcstwx/pcp_gefs_day1_q50_us_{ID}.png', note:'GEFS 21成员集合预报中位数' },
-        { title:'第3天累计降水', tpl:'https://www.worldagweather.com/fcstwx/pcp_gefs_day3_q50_us_{ID}.png', note:'GEFS 集合预报第3天' },
-        { title:'第7天累计降水', tpl:'https://www.worldagweather.com/fcstwx/pcp_gefs_day7_q50_us_{ID}.png', note:'GEFS 集合预报第7天' },
+    { group:'⚡ NOAA SPC 强对流 & 洪水风险', source:'World Ag Weather · 服务端每日探测',
+      items:[
+        { key:'noaa_spc', title:'Day1 对流天气展望', note:'SPC 发布时次由服务端解析(见图块标题)' },
+        { key:'us_flood', title:'National Flood Hazard Outlook', note:'weather.gov 全美洪水风险展望' },
       ]
     },
-    { group:'🌡️ 美国7天温度预报 (GEFS集合)', source:'World Ag Weather · 运行ID自动探测',
-      images:[
-        { title:'7天平均温度', tpl:'https://www.worldagweather.com/fcstwx/tmp_gefs_day7_us_{ID}.png', note:'GEFS 集合预报平均温度' },
-        { title:'7天最高温度', tpl:'https://www.worldagweather.com/fcstwx/tmax_gefs_day7_us_{ID}.png', note:'GEFS 集合预报最高温' },
-        { title:'7天最低温度', tpl:'https://www.worldagweather.com/fcstwx/tmin_gefs_day7_us_{ID}.png', note:'GEFS 集合预报最低温' },
+    { group:'🌡️ 美国气温距平 (GEFS 集合)', source:'World Ag Weather · 服务端每日探测',
+      items:[
+        { key:'us_temp_w1', title:'第1周气温距平', note:'GEFS 集合预报 · 未来7天' },
+        { key:'us_temp_w2', title:'第2周气温距平', note:'GEFS 集合预报 · 未来8-14天' },
       ]
     },
-    { group:'📊 美国降水距平 (GFS)', source:'World Ag Weather · 固定URL无需ID',
-      images:[
-        { title:'GFS 降水距平', tpl:'https://www.worldagweather.com/fcstwx/fcstpcp_anom_gfs_us.png', note:'GFS模型降水与气候态对比，红=偏干/蓝=偏湿' },
+    { group:'🌧️ 美国降水预报 (GEFS 集合 Q50)', source:'World Ag Weather · 服务端每日探测',
+      items:[
+        { key:'us_pcp_w1', title:'GEFS 第1周降水', note:'集合中位数(Q50) · 未来7天' },
+        { key:'us_pcp_w2', title:'GEFS 第2周降水', note:'集合中位数(Q50) · 未来8-14天' },
+      ]
+    },
+    { group:'🌧️ 美国降水预报 (EC 集合 Q50)', source:'World Ag Weather · 服务端每日探测',
+      items:[
+        { key:'ec_pcp_w1', title:'EC 第1周降水', note:'欧洲中心集合中位数(Q50) · 未来7天' },
+        { key:'ec_pcp_w2', title:'EC 第2周降水', note:'欧洲中心集合中位数(Q50) · 未来8-14天' },
+      ]
+    },
+    { group:'📡 GEFS 一周前预报', source:'World Ag Weather · 服务端每日探测',
+      items:[
+        { key:'us_pcp_w1ago', title:'一周前降水预报 (GEFS Q50)', note:'当周 imgnum-7, 与实际对照检验' },
+        { key:'us_tmp_w1ago', title:'一周前气温预报 (GEFS)', note:'当周 imgnum-7, 与实际对照检验' },
+      ]
+    },
+    { group:'📊 美国降雨距平', source:'World Ag Weather · 服务端每日探测',
+      items:[
+        { key:'us_pcp_anom', title:'GEFS 15天降雨距平 (Q50)', note:'红=偏干 / 蓝=偏湿' },
+        { key:'us_pcp_anom_ec', title:'EC 15天降雨距平 (Q50)', note:'红=偏干 / 蓝=偏湿' },
       ]
     },
   ]

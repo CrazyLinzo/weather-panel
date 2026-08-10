@@ -435,9 +435,9 @@ footer { border-top-color:var(--line2); }
 </section>
 
 <section class="sec" data-key="uswx">
-  <div class="sec-head" onclick="toggleSec(this)"><span class="num">肆</span><h2>美国 · 预报图集</h2><span class="sub">NOAA/NWS/USDM 官方外链 + GEFS 运行ID自动探测 · 各组可单独折叠</span><span class="tog">[−]</span></div>
+  <div class="sec-head" onclick="toggleSec(this)"><span class="num">肆</span><h2>美国 · 预报图集</h2><span class="sub">NOAA/NWS/USDM 官方外链 + World Ag Weather 图集(服务端每日探测 imgnum) · 各组可单独折叠</span><span class="tog">[−]</span></div>
   <div class="sec-body">
-    <div id="wawSection"><div style="text-align:center;color:var(--ink2);font-size:0.85rem;padding:10px;">⏳ 正在自动探测 World Ag Weather 最新运行ID…</div></div>
+    <div id="wawSection"><div style="text-align:center;color:var(--ink2);font-size:0.85rem;padding:10px;">⏳ 正在读取服务端图源探测结果…</div></div>
     <div id="usWeather"></div>
   </div>
 </section>
@@ -800,8 +800,8 @@ function renderImgSourceStrip() {
   const f = I.fixed;
   if (f && f.total != null) bits.push(`美国图集 <b>${f.ok}/${f.total}</b> 可用`);
   const w = I.waw;
-  if (w && w.ok) bits.push(`WAW GEFS ID ${w.id}`);
-  if (w && w.ok === false) bits.push(`<span style="color:var(--amber);">WAW GEFS 图源失效(已检出)</span>`);
+  if (w && w.ok) bits.push(`WAW 图源 OK（GFS <b>${w.gfs}</b> · EC <b>${w.ecmwf}</b>${w.noaaTime ? ` · SPC ${w.noaaTime}Z` : ''} · ${Object.keys(w.urls || {}).length}张）`);
+  if (w && w.ok === false) bits.push(`<span style="color:var(--amber);">WAW 图源失效(已检出)</span>`);
   if (!bits.length) { el.style.display = 'none'; return; }
   el.innerHTML = `🖼️ <b>图源时效自动探测</b>（服务端 · ${I.probedAt}）　·　${bits.join('　·　')}`;
   el.style.display = 'block';
@@ -1202,38 +1202,30 @@ function renderUSWeather() {
     </details>`).join('');
 }
 
-// ---------- World Ag Weather 运行ID自动探测 ----------
+// ---------- World Ag Weather 美国预报图集 (服务端 imgnum) ----------
 function probeImage(url) {
   return new Promise(res => { const im = new Image(); im.onload = () => res(true); im.onerror = () => res(false); im.src = url; });
 }
-async function findWawId() {
-  const days = Math.max(0, Math.floor((Date.now() - new Date(WAW_CONFIG.anchorDate + 'T00:00:00Z')) / 86400000));
-  const upper = WAW_CONFIG.anchorId + days * WAW_CONFIG.perDay + WAW_CONFIG.margin;
-  const lower = Math.max(1, upper - WAW_CONFIG.maxProbe);
-  for (let id = upper; id >= lower; id--) {
-    if (await probeImage(WAW_CONFIG.probeTpl.replace('{ID}', id))) return id;
-  }
-  return null;
-}
-async function renderWawSection() {
+function renderWawSection() {
   const el = document.getElementById('wawSection');
   if (!el) return;
   const sv = (typeof AUTO_IMG_SOURCES !== 'undefined') ? AUTO_IMG_SOURCES.waw : null;
-  let id = null;
-  if (sv && sv.ok) { id = sv.id; }                                   // 服务端已命中运行ID → 直接使用
-  else if (sv && sv.ok === false) {                                  // 服务端已检出整源失效 → 不再空转探测
-    el.innerHTML = `<div style="border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);font-size:0.8rem;padding:8px 14px;margin-bottom:14px;">⚠️ <b>服务端探测：World Ag Weather 图源已失效</b>（${sv.note || '所有已知ID均404'}）· 已跳过浏览器探测，GEFS 图组暂不可用（NOAA 图组不受影响）。</div>`;
+  // 图源URL依赖每日动态 imgnum, 只能由服务端(getimglabs.pl)解析; 无服务端命中则整组降级
+  if (!sv || !sv.ok || !sv.urls) {
+    el.innerHTML = `<div style="border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);font-size:0.8rem;padding:8px 14px;margin-bottom:14px;">⚠️ <b>World Ag Weather 美国预报图集暂不可用</b>${sv && sv.note ? `（${sv.note}）` : '（无服务端图源数据；图集URL依赖每日动态编号，浏览器无法自行探测）'}· NOAA 固定图集（下方）不受影响。</div>`;
     return;
   }
-  if (id == null) id = await findWawId();                            // 无服务端数据时回退浏览器探测
-  if (id == null) {
-    el.innerHTML = `<div style="border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);font-size:0.8rem;padding:8px 14px;margin-bottom:14px;">⚠️ World Ag Weather 运行ID探测失败, GEFS 图组暂不可用（NOAA 图组不受影响）。</div>`;
-    return;
-  }
-  el.innerHTML = WAW_CONFIG.groups.map(g => `
+  const U = sv.urls;
+  const hdr = `<div style="font-size:0.74rem;color:var(--ink2);margin:0 0 10px;">🖼️ 服务端每日探测 · GFS/GEFS 编号 <b>${sv.gfs}</b> · EC 编号 <b>${sv.ecmwf}</b>${sv.noaaTime ? ` · SPC 发布 <b>${sv.noaaTime}Z</b>` : ''} · ${sv.probedAt || ''}</div>`;
+  el.innerHTML = hdr + WAW_CONFIG.groups.map(g => `
     <details class="ig">
-      <summary>${g.group} <span class="src">— ${g.source}${g.group.includes('GEFS') ? ` · 当前ID ${id}` : ''}</span><span class="mk"></span></summary>
-      <div class="ig-body"><div class="img-grid">${g.images.map(img => imgCell(img.title, img.tpl.replace('{ID}', id), img.note)).join('')}</div></div>
+      <summary>${g.group} <span class="src">— ${g.source}</span><span class="mk"></span></summary>
+      <div class="ig-body"><div class="img-grid">${g.items.map(it => {
+        const url = U[it.key];
+        if (!url) return '';
+        const title = (it.key === 'noaa_spc' && sv.noaaTime) ? `${it.title} (${sv.noaaTime}Z)` : it.title;
+        return imgCell(title, url, it.note);
+      }).join('')}</div></div>
     </details>`).join('');
 }
 

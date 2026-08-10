@@ -19,6 +19,7 @@ import urllib.error
 import ssl
 import os
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +27,10 @@ DATA_DIR = os.path.join(REPO_ROOT, "data")
 IMG_SOURCES_PATH = os.path.join(DATA_DIR, "img-sources.js")
 BJ = timezone(timedelta(hours=8))
 UA = "Mozilla/5.0 (img-probe bot; +https://github.com/CrazyLinzo/weather-panel)"
+# worldagweather 会拒绝非浏览器请求, imgnum 抓取使用浏览器 UA(同日报脚本)
+UA_BROWSER = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+              "AppleWebKit/537.36 (KHTML, like Gecko) "
+              "Chrome/120.0.0.0 Safari/537.36")
 
 # ---------- NMC 图 URL 模板(与 fieldsight.html 完全一致) ----------
 # 降水预报: 起报时次为 UTC(1200/0600/0000), 日期按北京时
@@ -48,15 +53,92 @@ NMC_TEMPF_FFF = ["024", "048", "072", "096", "120", "144", "168"]
 def nmc_tempfc_url(y, m, d, hhmm, fff):
     return f"https://image.nmc.cn/product/{y}/{m}/{d}/RFFC/medium/SEVP_NMC_RFFC_SNWFD_ETM_ACHN_L88_P9_{y}{m}{d}{hhmm}{fff}12.jpg"
 
-# ---------- WAW GEFS 运行ID(与 fieldsight-data.js WAW_CONFIG 一致) ----------
-WAW_ANCHOR_ID = 3121
-WAW_ANCHOR_DATE = datetime(2026, 7, 2, tzinfo=BJ)
-WAW_PER_DAY = 4
-WAW_MARGIN = 6
-WAW_MAX_PROBE = 60
+# ---------- WAW imgnum 动态图编号(2026-08-10 起 URL 模板已改, 弃用递增ID猜测) ----------
+# worldagweather 所有预报图 URL 依赖每日递增的 imgnum, 经 /cgi-bin/ag/getimglabs.pl 获取:
+#   返回 '|' 分隔的 9 字段: radar|trmm|unknown|pcp|uspcp|gfs|cmc|ecmwf|txn
+# 本模块按日报脚本 generate_report.py 的 build_image_urls 重建"美国·预报图集"全部URL,
+# 前端直接消费服务端拼好的 urls 映射, 不再浏览器逐个探测。
+WA_BASE = "https://www.worldagweather.com"
+WA_IMGNUM_URL = f"{WA_BASE}/cgi-bin/ag/getimglabs.pl"
+WA_IMGNUM_KEYS = ["radar", "trmm", "unknown", "pcp", "uspcp", "gfs", "cmc", "ecmwf", "txn"]
+NOAA_SPC_PAGE = "https://www.spc.noaa.gov/products/outlook/day1otlk.html"
+NOAA_SPC_IMG = "https://www.spc.noaa.gov/products/outlook"
+US_FLOOD_URL = "https://www.weather.gov/images/owp/FHO/National/National_FHO.png"
+# 命中判定以其中3类代表性URL为探针(温度无q50; 距平; EC集合)
+WAW_KEY_PROBES = [
+    "us_temp_w1",
+    "us_pcp_w1",
+    "ec_pcp_w1",
+]
 
-def waw_probe_url(tid):
-    return f"https://www.worldagweather.com/fcstwx/pcp_gefs_day1_q50_us_{tid}.png"
+
+def http_get(url, timeout=20):
+    """GET 并返回 bytes; 带浏览器 UA(worldagweather 拒绝非浏览器)。SSL 证书问题降级不校验。"""
+    req = urllib.request.Request(url, headers={"User-Agent": UA_BROWSER})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, ssl.SSLCertVerificationError):
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl._create_unverified_context()) as r:
+                return r.read()
+        raise
+
+
+def waw_build_us_urls(g, e, noaa_time):
+    """与日报脚本 build_image_urls 的美国部分一致(键名对齐前端 WAW_CONFIG.items[].key)。"""
+    return {
+        "noaa_spc":    f"{NOAA_SPC_IMG}/day1otlk_{noaa_time}.png",
+        "us_flood":    US_FLOOD_URL,
+        "us_temp_w1":  f"{WA_BASE}/fcstwx/tmp_gefs_day7_us_{g}.png",
+        "us_temp_w2":  f"{WA_BASE}/fcstwx/tmp_gefs_day8_us_{g}.png",
+        "us_pcp_w1":   f"{WA_BASE}/fcstwx/pcp_gefs_day7_q50_us_{g}.png",
+        "us_pcp_w2":   f"{WA_BASE}/fcstwx/pcp_gefs_day8_q50_us_{g}.png",
+        "ec_pcp_w1":   f"{WA_BASE}/fcstwx/pcp_ens_day7_q50_us_{e}.png",
+        "ec_pcp_w2":   f"{WA_BASE}/fcstwx/pcp_ens_day8_q50_us_{e}.png",
+        "us_pcp_anom":    f"{WA_BASE}/fcstwx/pcp_gefs_anom_q50_us_{g}.png",
+        "us_pcp_anom_ec": f"{WA_BASE}/fcstwx/pcp_ens_anom_q50_us_{e}.png",
+        "us_pcp_w1ago": f"{WA_BASE}/fcstwx/pcp_gefs_day7_q50_us_{int(g) - 7}.png",
+        "us_tmp_w1ago": f"{WA_BASE}/fcstwx/tmp_gefs_day7_us_{int(g) - 7}.png",
+    }
+
+
+def probe_waw(today):
+    """通过 getimglabs.pl 取当日 imgnum(GFS/GEFS 共用 gfs 字段, EC 用 ecmwf 字段),
+    解析 SPC 发布时次, 拼出美国图集全部 URL 并抽样验证。返回 {ok, gfs, ecmwf, noaaTime, probedAt, urls}。"""
+    try:
+        raw = http_get(WA_IMGNUM_URL).decode("utf-8", "ignore").strip()
+        parts = raw.split("|")
+        if len(parts) < len(WA_IMGNUM_KEYS):
+            return {"ok": False, "note": f"getimglabs.pl 返回字段异常: {parts[:3]}"}
+        imgnum = dict(zip(WA_IMGNUM_KEYS, parts))
+        g, e = imgnum["gfs"], imgnum["ecmwf"]
+
+        # SPC 发布时次: 从 Day1 页面解析 day1otlk_(\d{4})_prt.html
+        noaa_time = None
+        try:
+            page = http_get(NOAA_SPC_PAGE).decode("utf-8", "ignore")
+            m = re.search(r"day1otlk_(\d{4})_prt\.html", page)
+            if m:
+                noaa_time = m.group(1)
+        except Exception:
+            noaa_time = None
+
+        urls = waw_build_us_urls(g, e, noaa_time or "1200")
+        # 抽样验证 3 类代表性 URL(温度/降水/EC集合), 全中才判定可用
+        bad = [k for k in WAW_KEY_PROBES if not probe(urls[k])]
+        if bad:
+            return {"ok": False, "note": f"imgnum 解析成功(gfs={g})但抽样URL失效: {bad}"}
+        return {
+            "ok": True,
+            "gfs": g,
+            "ecmwf": e,
+            "noaaTime": noaa_time,
+            "probedAt": today.strftime("%Y-%m-%d %H:%M"),
+            "urls": urls,
+        }
+    except Exception as ex:
+        return {"ok": False, "note": f"WAW imgnum 获取失败: {str(ex)[:120]}"}
 
 # ---------- 美国固定图集(与 fieldsight-data.js usWeatherImages 一致) ----------
 FIXED_IMAGES = [
@@ -139,18 +221,6 @@ def probe_nmc_tempfc(now_bj):
     return None
 
 
-def probe_waw(today):
-    """WAW GEFS 运行ID: 从估算上界向下探测, 返回 {ok, id|note}。"""
-    days = (today - WAW_ANCHOR_DATE).days
-    top = WAW_ANCHOR_ID + max(days, 0) * WAW_PER_DAY + WAW_MARGIN
-    tried = 0
-    for tid in range(top, top - WAW_MAX_PROBE, -1):
-        tried += 1
-        if probe(waw_probe_url(tid)):
-            return {"ok": True, "id": tid}
-    return {"ok": False, "note": f"WAW GEFS 图源失效: 自ID {top} 向下探测 {tried} 次全404(含锚点), 疑似URL模板变更或停更", "top": top}
-
-
 def main():
     now_bj = datetime.now(BJ)
     now_utc = datetime.now(timezone.utc)
@@ -186,7 +256,10 @@ def main():
     print(f"  nmc.precip: {out['nmc']['precip']['date'] if out['nmc']['precip'] else '未命中'}")
     print(f"  nmc.soil:   {out['nmc']['soil']['date'] if out['nmc']['soil'] else '未命中'}")
     print(f"  nmc.tempFc: {out['nmc']['tempFc']['date'] if out['nmc']['tempFc'] else '未命中'}")
-    print(f"  waw: {'ok id=' + str(out['waw']['id']) if out['waw']['ok'] else out['waw']['note']}")
+    if out["waw"].get("ok"):
+        print(f"  waw: ok gfs={out['waw']['gfs']} ecmwf={out['waw']['ecmwf']} spc={out['waw'].get('noaaTime')}Z 图集 {len(out['waw']['urls'])} 张")
+    else:
+        print(f"  waw: {out['waw']['note']}")
     print(f"  fixed: {out['fixed']['ok']}/{out['fixed']['total']} 可用")
     return 0
 
