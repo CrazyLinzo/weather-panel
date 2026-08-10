@@ -1,0 +1,42 @@
+name: Daily official data fetch
+
+# 差异化核心: 每日自动抓官方源 → 提交数据 → Pages 自重建
+# 原仓库为纯人工上传, 此工作流是本看板"自更新"差异化的载体。
+
+on:
+  schedule:
+    # 每日 00:17 北京时间 (16:17 UTC), 避开整点流量
+    - cron: '17 16 * * *'
+  workflow_dispatch:        # 支持仓库 Actions 页手动触发
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Run fetch script
+        run: python3 scripts/fetch_official.py
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::No data changes — nothing to commit"
+          else
+            git commit -m "chore: 自动采集官方数据 $(date -u +%Y-%m-%d)"
+            git push
+            echo "::notice::Data pushed — Pages will rebuild"
+          fi

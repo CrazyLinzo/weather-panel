@@ -426,7 +426,7 @@ footer { border-top-color:var(--line2); }
 
 <section class="sec" data-key="ocean">
   <div class="sec-head" onclick="toggleSec(this)"><span class="num">贰</span><h2>海洋指数</h2><span class="sub" id="oceanSub">ENSO · PDO · NAO · IOD</span><span class="tog">[−]</span></div>
-  <div class="sec-body"><div class="ocean-grid" id="oceanGrid"></div></div>
+  <div class="sec-body"><div class="ocean-grid" id="oceanGrid"></div><div class="conv-note" id="autoFetchStrip" style="display:none;margin-top:12px;"></div></div>
 </section>
 
 <section class="sec" data-key="cnwx">
@@ -498,6 +498,7 @@ footer { border-top-color:var(--line2); }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="fieldsight-data.js"></script>
+<script src="data/auto-fetch.js"></script>
 <script>
 // ============================================================
 // CONFIG（与 WeatherAI Panel 同参数）
@@ -759,6 +760,22 @@ function renderOceanIndices() {
       <div class="odir">↔ 较前值: ${o.dir}</div>
       <div class="src">观测期 ${o.obsPeriod}｜${o.cadence}｜核对 ${o.checked}<br>来源: ${o.sources.map(s => `<a href="${s.u}" target="_blank" rel="noopener">${s.l}</a>`).join(' · ')}</div>
     </div>`).join('');
+  renderAutoFetchStrip();
+}
+// ⚡ 官方数据自动采集状态条 —— 由 GitHub Actions 每日生成 data/auto-fetch.js, 这里只做展示
+function renderAutoFetchStrip() {
+  const el = document.getElementById('autoFetchStrip');
+  if (!el || typeof AUTO_FETCH === 'undefined') return;
+  const S = AUTO_FETCH.sources || {};
+  const parts = [];
+  const nao = S.nao, nino = S.nino34, mr = S.midrange;
+  if (nao && nao.value != null) parts.push(`NOAA CPC NAO 日值 <b>${nao.value}</b>（观测 ${nao.date}）`);
+  if (nino && nino.anom != null) parts.push(`CPC NINO3.4 距平 <b>${nino.anom >= 0 ? '+' : ''}${nino.anom}°C</b>（${nino.month}）`);
+  if (mr && mr.snapshot) parts.push(`中期公报快照 <a href="${mr.snapshot}" target="_blank" rel="noopener">${mr.snapshot.split('/').pop()}</a>`);
+  el.innerHTML = parts.length
+    ? `⚡ <b>官方数据自动采集</b>（GitHub Actions 每日 00:17）· 上次 ${AUTO_FETCH.fetchedAt}　·　${parts.join('　·　')}　<a class="conv-srclink" href="https://github.com/CrazyLinzo/weather-panel/tree/master/data/midrange" target="_blank" rel="noopener">快照存档 ↗</a>`
+    : '';
+  el.style.display = parts.length ? 'block' : 'none';
 }
 
 // ---------- 中国预报图 (中央气象台官方降水图内嵌·时间戳自动探测 + 官方导航) ----------
