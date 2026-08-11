@@ -2,6 +2,14 @@
 
 建发农产品 · 农业气象智能监测面板 · 8大品种 107个产区实时气象 + 季节性分析
 
+## 📋 日常更新（从这里开始）
+
+- **数据自动更新**：GitHub Actions 每日 00:17 生成 `data/*.js`，**无需操作**
+- **每周人工维护**：改 `fieldsight-data.js`（影响推演 / 人工事件 / 策略 / 新闻）→ `git commit` + `git push`
+- **台风候选审核**（可选）：`python scripts/review_events.py` → push `data/special-events.js`
+- **改动前**：先 `git pull`（同步 Actions 自动提交）再改；改完 `node scripts/_test_render.js` 验证
+- 完整流程见 **docs/项目说明.md →「更新流程」**；未来优化方向见 `memo8.10.md`
+
 ## 本地入口
 
 - `fieldsight.html`：研究报告风完整版（10 个板块，含中国天气多维度、特殊天气事件和台风监测）
