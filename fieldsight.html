@@ -500,6 +500,7 @@ footer { border-top-color:var(--line2); }
 <script src="fieldsight-data.js"></script>
 <script src="data/auto-fetch.js"></script>
 <script src="data/history.js"></script>
+<script src="data/crop-progress.js"></script>
 <script src="data/img-sources.js"></script>
 <script>
 // ============================================================
@@ -734,9 +735,37 @@ function assessRisks(m) {
 // ============================================================
 // 渲染
 // ============================================================
+// ============================================================
+// ⚡ 海洋指数自动口径映射 —— AUTO_FETCH(服务端每日) 有值则覆盖人工层数值, 缺失回退人工层
+// 原则: 数值走自动层口径; 解读/风险/定性文字保留人工审核; 口径差异以"⚡自动"标注
+// ============================================================
+function autoSrc(key) {
+  if (typeof AUTO_FETCH === 'undefined') return null;
+  const s = (AUTO_FETCH.sources || {})[key];
+  return s && s.value != null ? s : null;   // 各源主数值字段统一为 value; nino34 特判 anom
+}
+function autoNum(key) {
+  if (typeof AUTO_FETCH === 'undefined') return null;
+  const s = (AUTO_FETCH.sources || {})[key];
+  if (!s) return null;
+  const f = (key === 'nino34') ? 'anom' : 'value';
+  return s[f] != null ? s[f] : null;
+}
+function fmtP(v, dec, suf) { return (v >= 0 ? '+' : '') + v.toFixed(dec == null ? 0 : dec) + (suf || ''); }
 function renderEnsoBar() {
-  document.getElementById('ensoBar').innerHTML = ensoOverview.map(e => `
-    <div class="stat"><div class="v">${e.value}</div><div class="l">${e.label}</div><div class="s">${e.status}</div></div>`).join('');
+  const auto = [
+    { key: 'nino34', fmt: v => fmtP(v, 2, '°C'), tag: '⚡自动 · CPC 月值', lbl: '相对NINO3.4 (自动口径)' },
+    { key: 'soi',    fmt: v => '' + v.toFixed(1), tag: '⚡自动 · BOM 30天口径', lbl: 'SOI 30天 (BOM)' },
+    { key: 'iod_wk', fmt: v => fmtP(v, 2), tag: '⚡自动 · BOM 周值', lbl: 'IOD 周值 (BOM)' },
+    null,  // 预测峰值无自动源, 保留人工
+  ];
+  document.getElementById('ensoBar').innerHTML = ensoOverview.map((e, i) => {
+    const a = auto[i];
+    const v = (a && autoNum(a.key) != null) ? a.fmt(autoNum(a.key)) : e.value;
+    const tag = (a && autoNum(a.key) != null) ? a.tag : e.status;
+    const lbl = (a && autoNum(a.key) != null && a.lbl) ? a.lbl : e.label;
+    return `<div class="stat"><div class="v">${v}</div><div class="l">${lbl}</div><div class="s">${tag}</div></div>`;
+  }).join('');
 }
 function renderAlerts() {
   document.getElementById('alertBox').innerHTML = alerts.map(a => `
@@ -748,20 +777,47 @@ function renderAlerts() {
       <div class="af"><span class="afc">${a.cadence}</span>｜观测期 ${a.obsPeriod}｜来源发布 ${a.updated}｜核对 ${a.checked}<br>来源: ${a.sources.map(s => `<a href="${s.u}" target="_blank" rel="noopener">${s.l}</a>`).join(' · ')}</div>
     </li>`).join('');
   const c = document.getElementById('climateSummary');
-  if (c) c.innerHTML = `<span class="tag high">El Niño · 极强</span>相对NINO3.4 +2.02(BOM 至8/2)/+1.2(NOAA 7/9)｜SOI 90天 −21.4｜PDO −0.94｜<b>IOD +0.63 连续两周高于正阈值</b>　·　官方来源 NOAA 7/9 · BOM 8/上旬 · 本站核对 ${SOURCE_CHECKED}`;
+  if (c) {
+    const nino = autoNum('nino34'), soi = autoNum('soi'), pdo = autoNum('pdo'), iwk = autoNum('iod_wk');
+    const ninoTxt = nino != null ? `NINO3.4距平 <b>${fmtP(nino, 2, '°C')}</b>(自动·CPC)` : `相对NINO3.4 +2.02(BOM 至8/2)/+1.2(NOAA 7/9)`;
+    const soiTxt = soi != null ? `SOI 30天 <b>${soi.toFixed(1)}</b>(自动·BOM)` : `SOI 90天 −21.4`;
+    const pdoTxt = pdo != null ? `PDO <b>${pdo.toFixed(2)}</b>(自动·NCEI)` : `PDO −0.94`;
+    const iwkTxt = iwk != null ? `<b>IOD周值 ${fmtP(iwk, 2)}</b>(自动·BOM)` : `<b>IOD +0.63 连续两周高于正阈值</b>`;
+    c.innerHTML = `<span class="tag high">El Niño · 极强</span>${ninoTxt}｜${soiTxt}｜${pdoTxt}｜${iwkTxt}　·　数值为自动口径(⚡服务端每日更新) · 解读见上方卡片 · 本站核对 ${SOURCE_CHECKED}`;
+  }
 }
 function renderOceanIndices() {
   const sub = document.getElementById('oceanSub');
   if (sub) sub.innerHTML = `ENSO · PDO · NAO · IOD　<span class="tag mid">4项已核对</span>本站核对 ${SOURCE_CHECKED}`;
-  document.getElementById('oceanGrid').innerHTML = oceanIndices.map(o => `
+  // 自动口径注入规则: [卡索引, 需覆盖的 metrics 下标, 源key, 数值字段, 格式化, 行标签注脚]
+  const RULES = [
+    { m: 0, key: 'nino34', fmt: v => fmtP(v, 2, '°C'), foot: '⚡自动·CPC月值' },
+    { m: 2, key: 'soi',    fmt: v => v.toFixed(1),     foot: '⚡自动·BOM 30天口径' },
+    { m: 3, key: 'nino34', fmt: v => fmtP(v, 2, '°C'), foot: '⚡自动·CPC月值' },
+  ];
+  const RULES_2 = [ // PDO / NAO / IOD 卡
+    { m: 1, key: 'pdo',    fmt: v => v.toFixed(2),     foot: '⚡自动·NCEI ERSST v5 口径' },
+    { m: 1, key: 'nao',    fmt: v => v.toFixed(2),     foot: '⚡自动·CPC日值口径(滞后~10天)' },
+    { m: 1, key: 'iod_wk', fmt: v => fmtP(v, 2),       foot: '⚡自动·BOM周值口径' },
+  ];
+  document.getElementById('oceanGrid').innerHTML = oceanIndices.map((o, ci) => {
+    // 卡0=ENSO 用 RULES; 卡1/2/3=PDO/NAO/IOD 各对应 RULES_2[ci-1](同一列 m, 不可 find 否则永远命中第一条)
+    const rules = ci === 0 ? RULES : [RULES_2[ci - 1]];
+    const metrics = o.metrics.map((m, mi) => {
+      const r = rules.find(r => r.m === mi);
+      const v = (r && autoNum(r.key) != null) ? r.fmt(autoNum(r.key)) : null;
+      return v === null ? m : { ...m, v, l: m.l + ' ' + r.foot };
+    });
+    return `
     <div class="ocean" style="border-top-color:${o.borderColor};">
       <h4>${o.name}</h4>
-      ${o.metrics.map(m => `<div class="kv"><span class="k">${m.l}</span><span class="v ${m.c?'hot':''}">${m.v}</span></div>`).join('')}
+      ${metrics.map(m => `<div class="kv"><span class="k">${m.l}</span><span class="v ${m.c?'hot':''}">${m.v}</span></div>`).join('')}
       <div style="margin-top:8px;">${o.risks.map(r => `<span class="tag ${r.cls.replace('risk-','')}">${r.label}</span>`).join('')}</div>
       <div class="desc">${o.detail}</div>
       <div class="odir">↔ 较前值: ${o.dir}</div>
       <div class="src">观测期 ${o.obsPeriod}｜${o.cadence}｜核对 ${o.checked}<br>来源: ${o.sources.map(s => `<a href="${s.u}" target="_blank" rel="noopener">${s.l}</a>`).join(' · ')}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   renderAutoFetchStrip();
   renderAutoHistory();
   renderImgSourceStrip();
@@ -772,12 +828,14 @@ function renderAutoFetchStrip() {
   if (!el || typeof AUTO_FETCH === 'undefined') return;
   const S = AUTO_FETCH.sources || {};
   const parts = [];
-  const nao = S.nao, nino = S.nino34, pdo = S.pdo, ao = S.ao, iod = S.iod, mr = S.midrange, ty = S.typhoon;
+  const nao = S.nao, nino = S.nino34, pdo = S.pdo, ao = S.ao, iod = S.iod, soi = S.soi, iwk = S.iod_wk, mr = S.midrange, ty = S.typhoon;
   if (nao && nao.value != null) parts.push(`NAO <b>${nao.value}</b>（${nao.date}）`);
   if (nino && nino.anom != null) parts.push(`NINO3.4距平 <b>${nino.anom >= 0 ? '+' : ''}${nino.anom}°C</b>（${nino.month}）${nino.phase ? `<span class="tag high">${nino.phase}</span>` : ''}`);
   if (pdo && pdo.value != null) parts.push(`PDO <b>${pdo.value}</b>（${pdo.month}，${pdo.phase}）`);
   if (ao && ao.value != null) parts.push(`AO <b>${ao.value}</b>（${ao.date}，${ao.phase}）`);
-  if (iod && iod.value != null) parts.push(`IOD(DMI) <b>${iod.value}</b>（${iod.month}${iod.prelim ? '·初值' : ''}，${iod.phase}）`);
+  if (iod && iod.value != null) parts.push(`IOD(DMI月) <b>${iod.value}</b>（${iod.month}${iod.prelim ? '·初值' : ''}，${iod.phase}）`);
+  if (soi && soi.value != null) parts.push(`SOI 30天 <b>${soi.value}</b>（至${soi.window_end}）`);
+  if (iwk && iwk.value != null) parts.push(`IOD周值 <b>${iwk.value >= 0 ? '+' : ''}${iwk.value}</b>（至${iwk.week_end}，${iwk.phase}）`);
   if (mr && mr.snapshot) parts.push(`中期公报 <a href="${mr.snapshot}" target="_blank" rel="noopener">${mr.snapshot.split('/').pop()}</a>`);
   if (ty && ty.count != null) parts.push(`CMA实时台风 <b>${ty.count}个活动</b>（${(ty.list || []).map(x => x.cn).join('、')}）`);
   el.innerHTML = parts.length
@@ -824,10 +882,15 @@ function renderAutoHistory() {
     return `<svg width="${w}" height="${h}" style="display:block;background:var(--panel);border:1px solid var(--line);border-radius:3px;"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
   };
   const d0 = H[0].d, d1 = H[H.length - 1].d;
-  el.innerHTML = `<b>⚡ 自动数据趋势</b><span style="font-size:.72rem;color:var(--ink2);">（${d0} → ${d1} · 自动采集以来）</span>
+  const cell = (label, svg, unit) => `<div><div style="font-size:.72rem;color:var(--ink2);margin-bottom:2px;">${label}${unit ? ` <span style="color:var(--ink3);">${unit}</span>` : ''}</div>${svg}</div>`;
+  el.innerHTML = `<b>⚡ 自动数据趋势</b><span style="font-size:.72rem;color:var(--ink2);">（${d0} → ${d1} · 自动采集以来，缺失值跳空）</span>
     <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;">
-      <div><div style="font-size:.72rem;color:var(--ink2);margin-bottom:2px;">NINO3.4 距平(°C)</div>${spark(H.map(h => h.nino), '#d97706')}</div>
-      <div><div style="font-size:.72rem;color:var(--ink2);margin-bottom:2px;">NAO</div>${spark(H.map(h => h.nao), '#2563eb')}</div>
+      ${cell('NINO3.4 距平', spark(H.map(h => h.nino), '#d97706'), '°C')}
+      ${cell('SOI 30天', spark(H.map(h => h.soi), '#0ea5e9'), 'BOM')}
+      ${cell('IOD 周值', spark(H.map(h => h.iod_wk), '#10b981'), 'BOM')}
+      ${cell('NAO', spark(H.map(h => h.nao), '#2563eb'))}
+      ${cell('PDO', spark(H.map(h => h.pdo), '#8b5cf6'))}
+      ${cell('AO', spark(H.map(h => h.ao), '#ef4444'))}
     </div>`;
   el.style.display = 'block';
 }
@@ -1416,6 +1479,36 @@ const calendarMatch = [
   { crop:'coffee', kw:'米纳斯' }, { crop:'sugar', kw:'崇左' }, { crop:'sugar', kw:'孔敬' },
 ];
 function renderCalendar(results) {
+  // 🇺🇸 美国三行自动同步 —— 数据来自 data/crop-progress.js(GitHub Actions 每日生成)
+  // season 全自动(数值+5年均+周终日期, 标 ⚡); risk 的 USDA 句按新数值重建(删失效对比表述),
+  // 原"本站补充"分析段保留。AUTO_CROP_PROGRESS 缺失(首次部署前)时整行回退人工文本。
+  const AUTO_CP = (typeof AUTO_CROP_PROGRESS !== 'undefined') ? AUTO_CROP_PROGRESS : null;
+  const CP_MON = {January:1, February:2, March:3, April:4, May:5, June:6, July:7, August:8, September:9, October:10, November:11, December:12};
+  const cpShort = we => { const m = /^(\w+) (\d{1,2}), (\d{4})$/.exec(we || ''); return (m && CP_MON[m[1]]) ? `${CP_MON[m[1]]}/${m[2]}` : (we || ''); };
+  const cpAvg = d => d ? `（${cpShort(d.weekEnd)}，5年均${d.avg}%）` : '';
+  const cpAuto = d => (d && d.weekEnd) ? `（${cpShort(d.weekEnd)}，自动同步）` : '';
+  const cpSrc = x => (AUTO_CP && AUTO_CP.released) ? `USDA ${AUTO_CP.released}发布（自动，数据至${cpShort(x.weekEnd)}）` : '';
+  function usOverride(c) {
+    if (!AUTO_CP || !AUTO_CP.crops) return null;
+    const g = AUTO_CP.crops, out = {};
+    const noteOf = src => { const p = String(src || '').split('本站补充：'); return p.length > 1 ? `<b>本站补充</b>：${p[1]}` : ''; };
+    if (c.region.indexOf('美国玉米带') !== -1) {
+      const x = g.corn || {};
+      if (x.dough && x.dented) out.season = `乳熟${x.dough.w}%、凹陷${x.dented.w}%（${cpShort(x.dough.weekEnd)}，5年均${x.dough.avg}%/${x.dented.avg}%）`;
+      if (x.condition) { out.risk = `USDA：优良率${x.condition.goodExc}%${cpAuto(x.condition)}`; out.srcDate = cpSrc(x.condition); }
+    } else if (c.region.indexOf('美国中西部') !== -1) {
+      const x = g.soybeans || {};
+      if (x.settingpods) out.season = `结荚${x.settingpods.w}%${cpAvg(x.settingpods)}`;
+      if (x.condition) { out.risk = `USDA：优良率${x.condition.goodExc}%${cpAuto(x.condition)}`; out.srcDate = cpSrc(x.condition); }
+    } else if (c.region.indexOf('美国春麦') !== -1) {
+      const x = g.springWheat || {};
+      if (x.harvested) out.season = `收获${x.harvested.w}%${cpAvg(x.harvested)}`;
+      if (x.condition) { out.risk = `USDA：优良率${x.condition.goodExc}%${cpAuto(x.condition)}`; out.srcDate = cpSrc(x.condition); }
+    } else return null;
+    const note = noteOf(c.risk);
+    if (note) out.risk = (out.risk || '') + note;
+    return out;
+  }
   function cell(i) {
     if (!results) return '<span style="color:var(--ink3);">⏳</span>';
     const mm = calendarMatch[i];
@@ -1441,12 +1534,18 @@ function renderCalendar(results) {
   document.getElementById('calendarSection').innerHTML = `
     <div class="cal-note">
       <b>数据口径</b>：本表「当前生长阶段」一律以外部权威机构发布的<b>逐站/逐省物候统计</b>为准，不采用本站自行推断；「核心风险」为官方实况/预报原文 + 本站气象分析的结合，官方原文以引号标出。
-      中国各行来自中央气象台《全国农业气象周报》附表2-5的逐省测站发育期统计，美国各行来自 USDA Crop Progress 原始件（优良率由本站将 Good+Excellent 两列相加得出）。
+      中国各行来自中央气象台《全国农业气象周报》附表2-5的逐省测站发育期统计，美国各行来自 USDA Crop Progress 原始件（优良率由本站将 Good+Excellent 两列相加得出）。美国玉米带/中西部/春麦三行数值由 GitHub Actions 每日自动同步（标 ⚡，数值取自 USDA 当周原文件），自动数据缺失时回退人工层。
       标注「未逐站核实」的行，表示该机构未发布对应逐期物候统计，阶段为常规农学判断，<b>不应作为方向性依据</b>。当前 ${nVer}/${cropCalendar.length} 行已核实到官方原始统计。
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>作物</th><th>产区</th><th>当前生长阶段</th><th>气象敏感期</th><th>核心风险（官方原文＋本站分析）</th><th>ENSO影响</th><th>实时气象(代表站)</th><th>来源与核实状态</th></tr></thead>
-      <tbody>${cropCalendar.map((c, i) => `<tr><td>${c.crop}</td><td>${c.region}</td><td>${c.season}</td><td>${c.sensitive}</td><td class="risk">${c.risk}</td><td style="font-size:0.8rem;">${c.enso}</td><td>${cell(i)}</td><td>${srcCell(c)}</td></tr>`).join('')}</tbody>
+      <tbody>${cropCalendar.map((c, i) => {
+        const u = usOverride(c);
+        const season = u && u.season ? `<span title="USDA Crop Progress 每周自动同步">⚡ ${u.season}</span>` : c.season;
+        const risk = u && u.risk ? u.risk : c.risk;
+        const cc = u && u.srcDate ? Object.assign({}, c, { srcDate: u.srcDate }) : c;
+        return `<tr><td>${c.crop}</td><td>${c.region}</td><td>${season}</td><td>${c.sensitive}</td><td class="risk">${risk}</td><td style="font-size:0.8rem;">${c.enso}</td><td>${cell(i)}</td><td>${srcCell(cc)}</td></tr>`;
+      }).join('')}</tbody>
     </table></div>
     <div class="cal-refs">
       <div class="cal-refs-t">📚 本章参考来源</div>

@@ -1,0 +1,6 @@
+// ============================================================
+// 🇺🇸 USDA Crop Progress 自动采集 — 由 GitHub Actions 每日生成, 勿手改
+// 生成时间: 2026-08-11 21:45 (+08:00) · 发布: August 10, 2026 (prog3226.txt)
+// 数值来自 USDA NASS 官方周报; 前端 typeof AUTO_CROP_PROGRESS 守卫, 缺失回退人工层
+// ============================================================
+const AUTO_CROP_PROGRESS = {"fetchedAt": "2026-08-11 21:45", "released": "August 10, 2026", "releaseFile": "prog3226.txt", "sourceUrl": "https://esmis.nal.usda.gov/publication/crop-progress", "crops": {"corn": {"silking": {"w": 94, "avg": 93, "weekEnd": "August 9, 2026"}, "dough": {"w": 61, "avg": 55, "weekEnd": "August 9, 2026"}, "dented": {"w": 16, "avg": 12, "weekEnd": "August 9, 2026"}, "condition": {"goodExc": 61, "vp": 4, "poor": 10, "fair": 25, "good": 48, "exc": 13, "weekEnd": "August 9, 2026"}}, "soybeans": {"blooming": {"w": 93, "avg": 91, "weekEnd": "August 9, 2026"}, "settingpods": {"w": 74, "avg": 69, "weekEnd": "August 9, 2026"}, "condition": {"goodExc": 62, "vp": 2, "poor": 8, "fair": 28, "good": 51, "exc": 11, "weekEnd": "August 9, 2026"}}, "winterWheat": {"harvested": {"w": 91, "avg": 91, "weekEnd": "August 9, 2026"}}, "springWheat": {"harvested": {"w": 24, "avg": 19, "weekEnd": "August 9, 2026"}, "condition": {"goodExc": 51, "vp": 3, "poor": 13, "fair": 33, "good": 44, "exc": 7, "weekEnd": "August 9, 2026"}}}};

@@ -20,6 +20,7 @@ import re
 import html as html_mod
 import os
 import json
+import time
 from datetime import datetime, timezone, timedelta
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,6 +32,7 @@ HISTORY_MAX = 90             # 自动数据时间序列保留条数
 TYPHOON_MAX = 6              # 最多抓取的活动台风详情数(防超时)
 BJ = timezone(timedelta(hours=8))
 UA = "Mozilla/5.0 (daily-fetch bot; +https://github.com/CrazyLinzo/weather-panel)"
+BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"  # BOM 拦截 bot UA
 
 GRADE_ZH = {"TD": "热带低压", "TS": "热带风暴", "STS": "强热带风暴", "TY": "台风", "STY": "强台风", "SuperTY": "超强台风"}
 
@@ -51,17 +53,29 @@ def now_bj():
     return datetime.now(BJ)
 
 
-def fetch(url, timeout=25):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+def fetch(url, timeout=25, ua=UA):
+    req = urllib.request.Request(url, headers={"User-Agent": ua})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
+
+
+def fetch_retry(url, tries=3, timeout=60, ua=UA, delay=2):
+    """带重试的抓取(仅回填/一次性任务用, 日常采集失败走降级铁律不重试)。"""
+    last = None
+    for _ in range(tries):
+        try:
+            return fetch(url, timeout=timeout, ua=ua)
+        except Exception as e:
+            last = e
+            time.sleep(delay)
+    raise last
 
 
 # ---------- 各源解析器: 失败抛异常, 由 main 捕获置 null ----------
 
 def parse_cpc_nao():
     """NOAA CPC NAO 日值: 纯文本, 每行 '年 月 日 值', 末行为最新。"""
-    d = fetch("ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii")
+    d = fetch("https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii")
     lines = [l.split() for l in d.decode("ascii", "ignore").splitlines() if l.strip()]
     y, m, day, v = lines[-1][:4]
     return {
@@ -137,7 +151,7 @@ def parse_ncei_pdo():
 
 def parse_cpc_ao():
     """NOAA CPC AO 日值: 纯文本 '年 月 日 值', 与 NAO 同目录同构。"""
-    d = fetch("ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii")
+    d = fetch("https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii")
     lines = [l.split() for l in d.decode("ascii", "ignore").splitlines() if l.strip()]
     y, m, day, v = lines[-1][:4]
     return {"value": round(float(v), 3), "date": f"{y}-{int(m):02d}-{int(day):02d}", "phase": ao_phase(float(v))}
@@ -148,6 +162,27 @@ def parse_psl_iod():
     d = fetch("https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/dmi.had.long.data")
     y, m, v = latest_month_from_wide(d, -9999.0)
     return {"value": round(v, 3), "month": f"{y}-{m:02d}", "phase": iod_phase(v), "prelim": True}
+
+
+def parse_bom_soi():
+    """BOM 南方涛动指数 SOI(30天滑动): CSV '窗口起始,窗口结束,值', 末行为最新。逐日更新。"""
+    d = fetch("https://www.bom.gov.au/clim_data/IDCKGSM000/soi.txt", ua=BROWSER_UA)
+    rows = [l.strip().split(",") for l in d.decode("utf-8", "ignore").splitlines() if l.strip()]
+    last = rows[-1]
+    if len(last) != 3:
+        raise ValueError(f"soi.txt 末行格式异常: {rows[-1]!r}")
+    return {"value": round(float(last[2]), 1), "window_start": last[0], "window_end": last[1], "note": "BOM 30天滑动口径"}
+
+
+def parse_bom_iod_wk():
+    """BOM 周度 IOD 指数: 文本 '周起始,周结束,值', 末行为最新周值。与面板 IOD 周值口径一致。"""
+    d = fetch("https://www.bom.gov.au/clim_data/IDCK000072/iod_1.txt", ua=BROWSER_UA)
+    rows = [l.strip().split(",") for l in d.decode("utf-8", "ignore").splitlines() if l.strip()]
+    last = rows[-1]
+    if len(last) != 3:
+        raise ValueError(f"iod_1.txt 末行格式异常: {rows[-1]!r}")
+    v = round(float(last[2]), 3)
+    return {"value": v, "week_start": last[0], "week_end": last[1], "phase": iod_phase(v)}
 
 
 def parse_nmc_midrange():
@@ -278,11 +313,13 @@ def json_dumps(v):
 
 
 def load_history():
-    """读回 data/history.js 中的 AUTO_HISTORY 数组(纯 JSON 载荷)。"""
+    """读回 data/history.js 中的 AUTO_HISTORY 数组(纯 JSON 载荷)。
+    注意: 不能用 split('=',1) 截取(文件头注释含 '='); 须定位 'AUTO_HISTORY = ' 关键字。"""
     try:
         with open(HISTORY_PATH, encoding="utf-8") as f:
-            js = f.read().split("=", 1)[1].strip().rstrip(";")
-        return json.loads(js)
+            js = f.read()
+        i = js.index("AUTO_HISTORY = ") + len("AUTO_HISTORY = ")
+        return json.loads(js[i:].strip().rstrip(";"))
     except Exception:
         return []
 
@@ -298,13 +335,95 @@ def write_history(entries):
     return HISTORY_PATH
 
 
+def backfill_history(days=90):
+    """首次部署回填: 从各官方源历史数据补齐最近 days 天时间序列(以 d 为键合并)。
+
+    日值指标(NAO/AO/SOI)取文件末 days 行; 周值(IOD)与月值(NINO3.4/PDO)取最近 days 天内观测。
+    任一源失败仅跳过该指标, 不中断整体回填。
+    """
+    by_day = {}
+
+    def put(dstr, **kv):
+        by_day.setdefault(dstr, {})["d"] = dstr
+        by_day[dstr].update(kv)
+
+    for url, field in (
+        ("https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii", "nao"),
+        ("https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii", "ao"),
+    ):
+        try:
+            rows = [l.split() for l in fetch_retry(url).decode("ascii", "ignore").splitlines() if l.strip()][-days:]
+            for y, m, day, v in rows:
+                put(f"{y}-{int(m):02d}-{int(day):02d}", **{field: round(float(v), 3)})
+        except Exception as e:
+            print(f"  backfill {field}: FAIL({e})")
+
+    def iso(d8):
+        """BOM 格式 YYYYMMDD → ISO YYYY-MM-DD(与日值指标键一致, 保证字典序正确)。"""
+        return f"{d8[:4]}-{d8[4:6]}-{d8[6:]}"
+
+    try:  # SOI 日值30天滑动
+        rows = [l.strip().split(",") for l in fetch_retry("https://www.bom.gov.au/clim_data/IDCKGSM000/soi.txt", ua=BROWSER_UA).decode("utf-8", "ignore").splitlines() if l.strip()][-days:]
+        for _, w1, v in rows:
+            put(iso(w1), soi=round(float(v), 1))
+    except Exception as e:
+        print(f"  backfill soi: FAIL({e})")
+
+    try:  # IOD 周值
+        rows = [l.strip().split(",") for l in fetch_retry("https://www.bom.gov.au/clim_data/IDCK000072/iod_1.txt", ua=BROWSER_UA).decode("utf-8", "ignore").splitlines() if l.strip()][-days // 7:]
+        for _, w1, v in rows:
+            put(iso(w1), iod_wk=round(float(v), 3))
+    except Exception as e:
+        print(f"  backfill iod_wk: FAIL({e})")
+
+    try:  # NINO3.4 月值(近3个月)
+        rows = [l.split() for l in fetch_retry("https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices").decode("utf-8", "ignore").splitlines() if l.strip() and l[0].isdigit()]
+        for r in rows[-3:]:
+            put(f"{int(r[0])}-{int(r[1]):02d}-28", nino=round(float(r[9]), 2))
+    except Exception as e:
+        print(f"  backfill nino: FAIL({e})")
+
+    try:  # PDO 月值(近3个月)
+        d = fetch_retry("https://www.ncei.noaa.gov/pub/data/cmb/ersst/v5/index/ersst.v5.pdo.dat").decode("utf-8", "ignore")
+        rows = [l.split() for l in d.splitlines() if l.strip() and l[0].isdigit() and len(l) >= 13]
+        got = 0
+        for r in reversed(rows):
+            y = int(r[0])
+            for m, v in reversed(list(enumerate(r[1:13], 1))):
+                if v == "99.99":
+                    continue
+                put(f"{y}-{m:02d}-28", pdo=round(float(v), 2))
+                got += 1
+                if got >= 3:
+                    break
+            if got >= 3:
+                break
+    except Exception as e:
+        print(f"  backfill pdo: FAIL({e})")
+
+    return sorted(by_day.values(), key=lambda e: e["d"])[-days:]
+
+
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="⚡ 官方数值层自动采集器")
+    ap.add_argument("--backfill", action="store_true", help="仅从官方源回填历史时间序列(供首次部署)后退出")
+    args = ap.parse_args()
+
+    if args.backfill:
+        entries = backfill_history()
+        path = write_history(entries)
+        print(f"[backfill] 回填 {len(entries)} 条 -> {path}")
+        return 0
+
     sources = {
-        "nao": {"label": "NOAA CPC NAO 日值", "url": "ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii"},
+        "nao": {"label": "NOAA CPC NAO 日值", "url": "https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.index.b500101.current.ascii"},
         "nino34": {"label": "CPC NINO3.4 周值", "url": "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"},
         "pdo": {"label": "NOAA NCEI PDO (ERSST v5)", "url": "https://www.ncei.noaa.gov/pub/data/cmb/ersst/v5/index/ersst.v5.pdo.dat"},
-        "ao": {"label": "NOAA CPC AO 日值", "url": "ftp://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii"},
+        "ao": {"label": "NOAA CPC AO 日值", "url": "https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.ao.index.b500101.current.ascii"},
         "iod": {"label": "NOAA PSL DMI (HadISST)", "url": "https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/dmi.had.long.data"},
+        "soi": {"label": "BOM 南方涛动指数 SOI(30天)", "url": "https://www.bom.gov.au/clim_data/IDCKGSM000/soi.txt"},
+        "iod_wk": {"label": "BOM 周度 IOD", "url": "https://www.bom.gov.au/clim_data/IDCK000072/iod_1.txt"},
         "midrange": {"label": "中央气象台《中期天气预报》快照", "url": "http://www.nmc.cn/publish/bulletin/mid-range.htm"},
         "typhoon": {"label": "中央气象台台风网 实时台风", "url": "https://typhoon.nmc.cn/"},
     }
@@ -314,6 +433,8 @@ def main():
         "pdo": parse_ncei_pdo,
         "ao": parse_cpc_ao,
         "iod": parse_psl_iod,
+        "soi": parse_bom_soi,
+        "iod_wk": parse_bom_iod_wk,
         "midrange": parse_nmc_midrange,
         "typhoon": parse_cma_typhoon,
     }
@@ -328,17 +449,23 @@ def main():
         except Exception as e:
             sources[key].update({"ok": False, "error": str(e)})
 
-    # 时间序列累积: 成功取到 NAO/NINO3.4 才追加当日值
+    # 时间序列累积: 任一核心指标成功即追加/更新当日条目(缺失字段置 null, 前端趋势跳过)
     fetched_at = now_bj()
     entries = load_history()
     today = fetched_at.strftime("%Y-%m-%d")
-    nao_v = sources["nao"].get("value")
-    nino_v = sources["nino34"].get("anom")
-    if nao_v is not None and nino_v is not None:
+    row = {
+        "nao": sources["nao"].get("value"),
+        "nino": sources["nino34"].get("anom"),
+        "pdo": sources["pdo"].get("value"),
+        "ao": sources["ao"].get("value"),
+        "soi": sources["soi"].get("value"),
+        "iod_wk": sources["iod_wk"].get("value"),
+    }
+    if any(v is not None for v in row.values()):
         if entries and entries[-1].get("d") == today:
-            entries[-1].update({"nao": nao_v, "nino": nino_v})
+            entries[-1].update(row)
         else:
-            entries.append({"d": today, "nao": nao_v, "nino": nino_v})
+            entries.append({"d": today, **row})
         del entries[:-HISTORY_MAX]
         hist_path = write_history(entries)
         print(f"  history: {len(entries)} 条 -> {hist_path}")

@@ -28,6 +28,9 @@ jobs:
       - name: Run fetch script
         run: python3 scripts/fetch_official.py
 
+      - name: Fetch USDA crop progress
+        run: python3 scripts/fetch_usda.py
+
       - name: Probe image sources
         run: python3 scripts/probe_sources.py
 
