@@ -28,8 +28,14 @@ jobs:
       - name: Run fetch script
         run: python3 scripts/fetch_official.py
 
+      - name: Parse midrange official
+        run: python3 scripts/parse_midrange.py
+
       - name: Fetch USDA crop progress
         run: python3 scripts/fetch_usda.py
+
+      - name: Probe event candidates
+        run: python3 scripts/probe_events.py
 
       - name: Probe image sources
         run: python3 scripts/probe_sources.py

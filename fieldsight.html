@@ -501,6 +501,8 @@ footer { border-top-color:var(--line2); }
 <script src="data/auto-fetch.js"></script>
 <script src="data/history.js"></script>
 <script src="data/crop-progress.js"></script>
+<script src="data/cn-outlook.js"></script>
+<script src="data/special-events.js"></script>
 <script src="data/img-sources.js"></script>
 <script>
 // ============================================================
@@ -1563,7 +1565,10 @@ function renderSpecialEvents() {
   if (!el) return;
   const EVENTS_MAX_AGE_DAYS = 3;
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const evs = (typeof SPECIAL_EVENTS !== 'undefined' ? SPECIAL_EVENTS : []).filter(e => {
+  // ⚡ 自动层事件(AUTO_EVENTS)与人工层(SPECIAL_EVENTS)合并; 自动事件标 ⚡自动
+  const srcEvents = (typeof SPECIAL_EVENTS !== 'undefined' ? SPECIAL_EVENTS : [])
+    .concat(typeof AUTO_EVENTS !== 'undefined' ? AUTO_EVENTS : []);
+  const evs = srcEvents.filter(e => {
     if (!e.date) return false;                       // 无日期按过期处理(不编造)
     const t = new Date(e.date);
     return !isNaN(t) && (today - t) / 86400e3 <= EVENTS_MAX_AGE_DAYS;
@@ -1571,7 +1576,7 @@ function renderSpecialEvents() {
   if (!evs.length) { hideSec('events'); return; }
   el.innerHTML = `<div class="event-grid">${evs.map(e => `
     <div class="event-card ${e.cls}">
-      <div class="ehead"><span class="eic">${e.icon}</span><h4>${e.title}</h4><span class="tag ${e.cls}">${e.severity}</span></div>
+      <div class="ehead"><span class="eic">${e.icon}</span><h4>${e.title}${e.auto ? ' <span class="tag low">⚡自动</span>' : ''}</h4><span class="tag ${e.cls}">${e.severity}</span></div>
       <div class="emeta"><span class="k">区域</span><span>${e.region}</span></div>
       <div class="emeta"><span class="k">时间</span><span>${e.time}</span></div>
       <div class="emeta"><span class="k">状态</span><span class="estatus">${e.status}</span></div>
@@ -1602,20 +1607,31 @@ function outlookRow(r) {
 }
 function renderCnAgriOutlook() {
   const c = CN_AGRI_OUTLOOK;
+  // ⚡ 官方事实自动同步 —— 数据来自 data/cn-outlook.js(GitHub Actions 每日生成)
+  // 只替换"未来10天"之后的各段(公报正文不含过去10天实况, 第1条人工保留); AUTO 缺失回退人工层。
+  const A = (typeof AUTO_CN_OUTLOOK !== 'undefined') ? AUTO_CN_OUTLOOK : null;
+  const autoOk = !!(A && A.official && A.official.length);
+  const official = autoOk ? [c.official[0], ...A.official] : c.official;
+  const issued = autoOk ? `${A.released}（⚡自动同步）` : c.issuedAt;
+  const horizon = autoOk && A.horizon ? A.horizon : c.horizon;
+  const forecaster = autoOk && A.forecaster ? A.forecaster : c.forecaster;
   const sub = document.getElementById('cnOutlookSub');
-  if (sub) sub.innerHTML = `${c.horizon}　<span class="tag mid">官方基准 ${c.issuedAt}</span>本站核对 ${c.checked}`;
+  if (sub) sub.innerHTML = `${horizon}　<span class="tag mid">官方基准 ${issued}</span>本站核对 ${c.checked}`;
   const el = document.getElementById('cnOutlookSection');
   if (!el) return;
   el.innerHTML = `
     <div class="ol-method">
-      <b>方法与边界</b>：下方「官方预报事实」逐条摘自 <a href="${c.srcUrl}" target="_blank" rel="noopener">${c.srcName}</a>（${c.issuedAt}；${c.forecaster}），数值与落区均为原文，未作改写或外推。
+      <b>方法与边界</b>：下方「官方预报事实」逐条摘自 <a href="${c.srcUrl}" target="_blank" rel="noopener">${c.srcName}</a>（${issued}；${forecaster}），数值与落区均为原文，未作改写或外推。
       「影响推演」为本站基于该预报的<b>条件性推断</b>，按既定口径<b>只给方向、风险等级与传导机制，不给单产百分比</b>——农业产量受品种、管理、灌溉与灾后恢复等多因素共同决定，单凭降水预报无法定量。置信度含义：高=预报明确覆盖该产区且量级清晰；中=落区覆盖但强度分布仍有分歧；低=预报未明确覆盖，仅由反向表述推得。
     </div>
 
     <details class="ig" open>
-      <summary>📋 官方预报事实（可核实） <span class="src">— ${c.srcName} · ${c.issuedAt}</span><span class="mk"></span></summary>
+      <summary>📋 官方预报事实（可核实） <span class="src">— ${c.srcName} · ${issued}</span><span class="mk"></span></summary>
       <div class="ig-body"><div class="ol-facts">
-        ${c.official.map(o => `<div class="ol-fact"><div class="ol-fact-t">${o.t}</div><div class="ol-fact-d">${o.d}</div></div>`).join('')}
+        ${official.map((o, idx) => {
+          const autoTag = autoOk && idx > 0 ? ' <span class="tag low">⚡自动</span>' : '';
+          return `<div class="ol-fact"><div class="ol-fact-t">${o.t}${autoTag}</div><div class="ol-fact-d">${o.d}</div></div>`;
+        }).join('')}
       </div></div>
     </details>
 
